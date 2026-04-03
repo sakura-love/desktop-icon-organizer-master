@@ -5,6 +5,7 @@
 
 import json
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -12,8 +13,18 @@ from typing import Dict, List, Optional
 from desktop_scanner import DesktopIcon
 
 
-BACKUP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backups")
-LAYOUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "layouts")
+def get_app_dir():
+    """获取应用程序所在目录（兼容打包后的exe）"""
+    if getattr(sys, 'frozen', False):
+        # 打包后的exe，使用exe所在目录
+        return os.path.dirname(sys.executable)
+    else:
+        # 脚本运行，使用脚本所在目录
+        return os.path.dirname(os.path.abspath(__file__))
+
+
+BACKUP_DIR = os.path.join(get_app_dir(), "backups")
+LAYOUT_DIR = os.path.join(get_app_dir(), "layouts")
 
 
 def ensure_dirs():
