@@ -217,4 +217,6 @@ desktop-icon-organizer-master/
 
 Made with ❤️ by [sakura-love](https://github.com/sakura-love)
 
+*Last updated: April 2026*
+
 </div>
