@@ -1,90 +1,207 @@
-# Desktop Icon Organizer
+<div align="center">
 
-一款 Windows 11 风格的桌面图标自动分类整理工具，支持智能分类、布局预览、拖拽排列、一键应用到桌面，并可显示持久化的半透明分类边框叠加层。
+# 🖥️ Desktop Icon Organizer
 
-## 功能特性
+**一款优雅的 Windows 桌面图标自动分类整理工具**
 
-- **智能图标分类** — 内置 14 类关键词规则库，支持本地关键词匹配、扩展名推断和 DuckDuckGo 联网搜索
-- **可视化布局预览** — 实时预览分类结果，支持拖拽交换图标位置
-- **一键应用到桌面** — 通过 Win32 API 直接操控桌面图标位置，无需重启
-- **桌面叠加层** — 在桌面显示半透明分类边框，主程序退出后依然保持显示
-- **备份与还原** — 支持桌面布局备份、自定义布局方案保存与加载
-- **Windows 11 风格界面** — 深色主题，现代化 UI 设计
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey.svg)](https://github.com/sakura-love/desktop-icon-organizer-master)
+[![Python](https://img.shields.io/badge/python-3.9%2B-yellow.svg)](https://www.python.org/)
 
-## 系统要求
+[功能特性](#-功能特性) • [快速开始](#-快速开始) • [截图预览](#-截图预览) • [技术架构](#-技术架构)
 
-- Windows 10 / 11
-- Python 3.9+
-- 管理员权限（操作桌面图标需要）
+</div>
 
-## 快速开始
+---
 
-### 安装依赖
+## ✨ 功能特性
+
+<table>
+<tr>
+<td width="50%">
+
+### 🤖 智能图标分类
+
+- **14 种预设类别** — 浏览器、办公、开发、游戏、社交通讯等
+- **多级分类策略** — 关键词匹配 → 扩展名推断 → 联网搜索
+- **DuckDuckGo 集成** — 无法识别的图标自动联网查询
+- **拖拽调整** — 可视化预览中自由调整图标位置
+
+</td>
+<td width="50%">
+
+### 🖥️ 桌面叠加层
+
+- **分类边框** — 在桌面显示半透明分类边框
+- **持久化显示** — 主程序退出后叠加层依然保持
+- **独立进程** — 叠加层运行于独立子进程，不影响主程序
+- **一键切换** — 显示/隐藏边框随时切换
+
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 📐 布局管理
+
+- **实时预览** — 等比缩放显示布局效果
+- **一键应用** — Win32 API 直接操控桌面图标
+- **即时生效** — 无需重启资源管理器
+- **竖向分区** — 每个类别独立一列，整齐美观
+
+</td>
+<td width="50%">
+
+### 💾 备份与还原
+
+- **自动备份** — 应用布局前自动保存当前状态
+- **自定义方案** — 保存常用布局方案随时加载
+- **历史记录** — 支持查看和还原历史备份
+- **一键还原** — 随时恢复到任意备份点
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🚀 快速开始
+
+### 方式一：直接运行（推荐）
+
+1. 前往 [Releases](https://github.com/sakura-love/desktop-icon-organizer-master/releases) 下载最新版 `DesktopIconOrganizer.exe`
+2. **右键 → 以管理员身份运行**
+3. 开始整理你的桌面！
+
+### 方式二：从源码运行
 
 ```bash
+# 克隆仓库
+git clone https://github.com/sakura-love/desktop-icon-organizer-master.git
+cd desktop-icon-organizer-master
+
+# 安装依赖
 pip install -r requirements.txt
-```
 
-### 运行程序
-
-```bash
+# 运行（需管理员权限）
 python main.py
 ```
 
-> 注意：需要以管理员权限运行，否则无法扫描和移动桌面图标。
+### 打包为单文件
 
-## 使用方法
+```bash
+pip install pyinstaller
+python -m PyInstaller build.spec --clean --noconfirm
+```
 
-1. **扫描桌面** — 自动获取当前桌面上所有图标信息
-2. **自动分类** — 使用关键词规则对图标进行分类
-3. **联网分类** — 对无法匹配的图标通过联网搜索进行分类
-4. **预览布局** — 在预览画布中查看分类结果，可拖拽调整
-5. **应用布局** — 将布局应用到实际桌面
-6. **显示/隐藏边框** — 在桌面显示或隐藏分类边框叠加层
+---
 
-## 项目结构
+## 📸 截图预览
+
+> _截图展示主界面、分类预览、桌面叠加层效果_
+
+---
+
+## 🏗️ 技术架构
 
 ```
-├── main.py                # 主程序入口（GUI）
-├── desktop_scanner.py     # 桌面图标扫描模块（Win32 API）
+┌─────────────────────────────────────────────────────────┐
+│                    MainApp (GUI)                        │
+│              customtkinter + Windows 11 深色主题         │
+└───────────────────────┬─────────────────────────────────┘
+                        │
+    ┌───────────────────┼───────────────────┐
+    ▼                   ▼                   ▼
+┌───────────┐   ┌───────────────┐   ┌───────────────┐
+│  Scanner  │   │  Classifier   │   │ Layout Engine │
+│ Win32 API │   │ Keyword+AI    │   │ Grid Layout   │
+└───────────┘   └───────────────┘   └───────────────┘
+                        │
+                        ▼
+              ┌─────────────────┐
+              │ Overlay Process │
+              │ 独立子进程 + IPC │
+              └─────────────────┘
+```
+
+| 模块 | 技术 | 说明 |
+|---|---|---|
+| GUI 框架 | CustomTkinter | Windows 11 风格深色主题 |
+| 图标扫描 | Win32 API | 跨进程访问 `SysListView32` |
+| 图像渲染 | Pillow | BGRA 位图 + `UpdateLayeredWindow` |
+| 叠加层 | 独立进程 + JSON IPC | PID 心跳检测 + 控制文件通信 |
+| 分类引擎 | 多级策略 | 关键词 → 扩展名 → 联网搜索 |
+
+---
+
+## 📁 项目结构
+
+```
+desktop-icon-organizer-master/
+├── main.py                # 主程序入口 (GUI)
+├── desktop_scanner.py     # 桌面图标扫描模块
 ├── icon_classifier.py     # 图标分类模块
 ├── layout_engine.py       # 布局引擎模块
-├── preview_canvas.py      # 布局预览画布模块
-├── desktop_overlay.py     # 桌面叠加层模块
+├── preview_canvas.py      # 布局预览画布
+├── desktop_overlay.py     # 桌面叠加层管理
 ├── overlay_process.py     # 独立叠加层进程
 ├── backup_manager.py      # 备份管理模块
 ├── PingFang SC.ttf        # 叠加层中文字体
+├── app.ico                # 应用图标
 ├── requirements.txt       # Python 依赖
-├── backups/               # 桌面布局备份目录
-└── layouts/               # 自定义布局方案目录
+├── build.spec             # PyInstaller 配置
+├── backups/               # 桌面布局备份
+└── layouts/               # 自定义布局方案
 ```
 
-## 技术实现
+---
 
-- **GUI 框架**：CustomTkinter
-- **图标扫描**：Win32 API 跨进程通信（`SysListView32` 控件）
-- **图像渲染**：Pillow（叠加层使用 `UpdateLayeredWindow` + BGRA 位图）
-- **叠加层架构**：独立子进程 + JSON 文件 IPC + PID 心跳检测
-- **分类引擎**：多级匹配策略（关键词 → 扩展名 → 联网搜索）
+## 🎨 分类类别
 
-## 分类类别
-
-| 类别 | 颜色 | 说明 |
+| 类别 | 颜色 | 包含应用 |
 |---|---|---|
-| 浏览器 | 蓝灰 | Chrome, Edge, Firefox 等 |
-| 办公软件 | 深蓝 | Office, WPS, PDF 阅读器 |
-| 开发工具 | 暗紫 | IDE, 编辑器, Git 工具 |
-| 影音娱乐 | 暗红 | 播放器, 音乐, 直播 |
-| 社交通讯 | 暗青 | 微信, QQ, 钉钉 |
-| 系统工具 | 暗绿 | 系统设置, 驱动, 终端 |
-| 游戏 | 暗橙 | Steam, Epic, 游戏平台 |
-| 设计创意 | 暗粉 | PS, AI, Figma |
-| 其他 | 灰色 | 未分类图标 |
+| 🌐 浏览器 | 蓝灰 | Chrome, Edge, Firefox, Safari... |
+| 📄 办公软件 | 深蓝 | Office, WPS, PDF 阅读器... |
+| 💻 开发工具 | 暗紫 | VS Code, PyCharm, Git... |
+| 🎬 影音娱乐 | 暗红 | 播放器, 音乐, 直播... |
+| 💬 社交通讯 | 暗青 | 微信, QQ, 钉钉, Telegram... |
+| ⚙️ 系统工具 | 暗绿 | 设置, 驱动, 终端, 压缩... |
+| 🎮 游戏 | 暗橙 | Steam, Epic, 游戏启动器... |
+| 🎨 设计创意 | 暗粉 | PS, AI, Figma, Blender... |
+| 📦 其他 | 灰色 | 未分类应用 |
 
-## 许可证
+---
 
-MIT License
+## ⚙️ 系统要求
 
-## 贡献
+- **操作系统**: Windows 10 / 11
+- **权限**: 需要以管理员身份运行
+- **Python**: 3.9+ (仅从源码运行时需要)
+
+---
+
+## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 创建 Pull Request
+
+---
+
+## 📄 许可证
+
+本项目基于 [MIT License](LICENSE) 开源。
+
+---
+
+<div align="center">
+
+**如果这个项目对你有帮助，请给一个 ⭐ Star 支持一下！**
+
+Made with ❤️ by [sakura-love](https://github.com/sakura-love)
+
+</div>
