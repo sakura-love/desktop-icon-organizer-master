@@ -181,7 +181,7 @@ def _render_overlay(layout: DesktopLayout, dpi_scale: float):
     return img
 
 
-def _write_layout(layout: DesktopLayout, dpi_scale: float):
+def _write_layout(layout: DesktopLayout, dpi_scale: float, icon_positions: list = None):
     """将布局数据序列化写入文件"""
     data = {
         "total_width": layout.total_width,
@@ -190,6 +190,7 @@ def _write_layout(layout: DesktopLayout, dpi_scale: float):
         "dpi_scale": dpi_scale,
         "categories": [],
         "cells": [],
+        "icon_positions": icon_positions or [],
     }
     for cat in layout.category_layouts:
         data["categories"].append({
@@ -268,7 +269,7 @@ class DesktopOverlay:
     def last_error(self) -> Optional[str]:
         return self._error
 
-    def show(self, layout: DesktopLayout, dpi_scale: float = 1.0) -> bool:
+    def show(self, layout: DesktopLayout, dpi_scale: float = 1.0, icon_positions: list = None) -> bool:
         """显示叠加层"""
         self._error = None
 
@@ -277,7 +278,7 @@ class DesktopOverlay:
         if existing:
             # 已有进程运行，发送更新指令
             try:
-                _write_layout(layout, dpi_scale)
+                _write_layout(layout, dpi_scale, icon_positions)
                 _write_control("update")
                 self._visible = True
                 self._started_by_us = False
@@ -289,7 +290,7 @@ class DesktopOverlay:
 
         # 启动新进程
         try:
-            _write_layout(layout, dpi_scale)
+            _write_layout(layout, dpi_scale, icon_positions)
 
             # PyInstaller 打包模式：使用 --overlay 参数启动自身
             # 开发模式：使用 python overlay_process.py
@@ -364,13 +365,13 @@ class DesktopOverlay:
 _overlay: Optional[DesktopOverlay] = None
 
 
-def show_desktop_overlay(layout: DesktopLayout, dpi_scale: float = 1.0, root=None):
+def show_desktop_overlay(layout: DesktopLayout, dpi_scale: float = 1.0, root=None, icon_positions: list = None):
     """显示桌面叠加层"""
     global _overlay
     if _overlay is None:
         _overlay = DesktopOverlay()
 
-    success = _overlay.show(layout, dpi_scale)
+    success = _overlay.show(layout, dpi_scale, icon_positions)
     if not success:
         err_msg = _overlay.last_error or "未知错误"
         raise RuntimeError(f"显示叠加层失败:\n{err_msg}")

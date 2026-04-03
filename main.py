@@ -963,7 +963,16 @@ class MainApp(ctk.CTk):
         """应用布局后重新显示叠加层"""
         if self._layout:
             try:
-                show_desktop_overlay(self._layout, self._desktop_info.dpi_scale, root=self)
+                # 从布局中收集图标位置用于熄屏唤醒后恢复
+                icon_positions = []
+                for cell in self._layout.cells:
+                    if cell.icon and not cell.is_header:
+                        icon_positions.append({
+                            "name": cell.icon.name,
+                            "x": cell.pixel_x,
+                            "y": cell.pixel_y,
+                        })
+                show_desktop_overlay(self._layout, self._desktop_info.dpi_scale, root=self, icon_positions=icon_positions)
                 self._overlay_shown = True
                 self._update_overlay_buttons()
             except Exception:
@@ -1055,7 +1064,16 @@ class MainApp(ctk.CTk):
         self._set_status("正在显示边框...")
         self.update_idletasks()
         try:
-            show_desktop_overlay(self._layout, self._desktop_info.dpi_scale, root=self)
+            # 收集图标位置用于熄屏唤醒后恢复
+            icon_positions = []
+            if self._icons:
+                for icon in self._icons:
+                    icon_positions.append({
+                        "name": icon.name,
+                        "x": icon.x,
+                        "y": icon.y,
+                    })
+            show_desktop_overlay(self._layout, self._desktop_info.dpi_scale, root=self, icon_positions=icon_positions)
             self._overlay_shown = True
             self._update_overlay_buttons()
             self._set_status("桌面边框已显示")

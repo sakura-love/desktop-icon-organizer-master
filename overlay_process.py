@@ -141,6 +141,11 @@ user32.IsWindowVisible.argtypes = [ctypes.c_void_p]
 user32.GetWindowRect.restype = ctypes.c_int
 user32.GetWindowRect.argtypes = [ctypes.c_void_p, ctypes.POINTER(RECT)]
 user32.SystemParametersInfoW.restype = ctypes.c_int
+user32.SendMessageTimeoutW.restype = ctypes.c_longlong
+user32.SendMessageTimeoutW.argtypes = [
+    ctypes.c_void_p, ctypes.c_uint, ctypes.c_longlong, ctypes.c_longlong,
+    ctypes.c_uint, ctypes.c_uint, ctypes.POINTER(ctypes.c_longlong)
+]
 gdi32.CreateCompatibleDC.restype = ctypes.c_void_p
 gdi32.CreateCompatibleDC.argtypes = [ctypes.c_void_p]
 gdi32.CreateDIBSection.restype = ctypes.c_void_p
@@ -301,22 +306,71 @@ def _create_layered_window(bgra_data, width, height, ox, oy):
     return hwnd
 
 
-def _run_overlay(hwnd, control_file, pid_file):
-    """运行消息循环，定期检查控制文件（非阻塞），同时更新心跳文件"""
+# 电源管理常量
+PBT_APMSUSPEND = 0x0004
+PBT_APMRESUMEAUTOMATIC = 0x0012
+PBT_APMRESUMESUSPEND = 0x0007
+WM_POWERBROADCAST = 0x0218
+WM_DISPLAYCHANGE = 0x007E
+
+# 显示器电源状态
+MONITOR_OFF = 2
+
+# 用于检测显示器状态变化
+_last_monitor_on = True
+
+
+def _is_monitor_on():
+    """检查显示器是否开启"""
+    try:
+        # 使用 SendSendMessageTimeout 查询显示器电源状态
+        result = ctypes.c_long()
+        user32.SendMessageTimeoutW(
+            0xFFFF,  # HWND_BROADCAST
+            0x0112,  # WM_SYSCOMMAND
+            0xF170,  # SC_MONITORPOWER
+            0xFFFFFFFF,  # -1 to query
+            0x0002,  # SMTO_ABORTIFHUNG
+            1000,
+            ctypes.byref(result)
+        )
+        # 返回值: -1 = 不支持, 1 = 节能模式, 2 = 关闭
+        return result.value == 0 or result.value == -1
+    except Exception:
+        return True  # 默认假设开启
+
+
+def _run_overlay(hwnd, control_file, pid_file, icon_positions=None):
+    """运行消息循环，定期检查控制文件（非阻塞），同时更新心跳文件和监听显示器状态"""
+    global _last_monitor_on
+    
     msg = MSG()
     check_counter = 0
     heartbeat_counter = 0
+    monitor_check_counter = 0
+    last_monitor_state = _is_monitor_on()
 
     while True:
         while user32.PeekMessageW(ctypes.byref(msg), None, 0, 0, 1):  # PM_REMOVE
             if msg.message == WM_CLOSE:
                 user32.DestroyWindow(hwnd)
                 return None
+            # 处理电源事件
+            if msg.message == WM_POWERBROADCAST:
+                if msg.wParam == PBT_APMRESUMESUSPEND or msg.wParam == PBT_APMRESUMEAUTOMATIC:
+                    # 从休眠/睡眠恢复，重新应用图标位置
+                    if icon_positions:
+                        print("[Overlay] 检测到系统唤醒，重新应用图标位置...")
+                        _restore_icon_positions(icon_positions)
+            # 处理显示器分辨率变化
+            if msg.message == WM_DISPLAYCHANGE:
+                print("[Overlay] 检测到显示器变化")
             user32.TranslateMessage(ctypes.byref(msg))
             user32.DispatchMessageW(ctypes.byref(msg))
 
         check_counter += 1
         heartbeat_counter += 1
+        monitor_check_counter += 1
 
         # 每50次循环(~0.5秒)写入心跳PID文件
         if heartbeat_counter >= 50:
@@ -326,6 +380,16 @@ def _run_overlay(hwnd, control_file, pid_file):
                     f.write(str(os.getpid()))
             except Exception:
                 pass
+
+        # 每20次循环(~0.2秒)检查显示器状态
+        if monitor_check_counter >= 20:
+            monitor_check_counter = 0
+            current_monitor_on = _is_monitor_on()
+            # 检测到显示器从关闭变为开启（熄屏唤醒）
+            if not last_monitor_state and current_monitor_on and icon_positions:
+                print("[Overlay] 检测到显示器唤醒，重新应用图标位置...")
+                _restore_icon_positions(icon_positions)
+            last_monitor_state = current_monitor_on
 
         if check_counter >= 100:
             check_counter = 0
@@ -409,9 +473,12 @@ def main():
     hwnd = _create_layered_window(bgra_data, w, h, ox, oy)
     print(f"[Overlay] 窗口创建成功: hwnd={hwnd:#x}")
 
+    # 获取图标位置数据用于唤醒恢复
+    icon_positions = data.get("icon_positions", [])
+
     # 主循环：等待更新或停止
     while True:
-        result = _run_overlay(hwnd, control_file, pid_file)
+        result = _run_overlay(hwnd, control_file, pid_file, icon_positions)
         if result == "update":
             # 更新时优先从临时布局文件读取
             temp_layout_file = os.path.join(base_dir, ".overlay_layout.json")
@@ -424,6 +491,8 @@ def main():
                 with open(update_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 dpi_scale = data.get("dpi_scale", 1.0)
+                # 更新图标位置
+                icon_positions = data.get("icon_positions", [])
                 layout = _rebuild_layout(data)
                 img = desktop_overlay._render_overlay(layout, dpi_scale)
                 if img:
