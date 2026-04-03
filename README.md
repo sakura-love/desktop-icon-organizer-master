@@ -171,17 +171,17 @@ desktop-icon-organizer-master/
 
 ## 🎨 分类类别
 
-| 类别 | 颜色 | 包含应用 |
-|---|---|---|
-| 🌐 浏览器 | 蓝灰 | Chrome, Edge, Firefox, Safari... |
-| 📄 办公软件 | 深蓝 | Office, WPS, PDF 阅读器... |
-| 💻 开发工具 | 暗紫 | VS Code, PyCharm, Git... |
-| 🎬 影音娱乐 | 暗红 | 播放器, 音乐, 直播... |
-| 💬 社交通讯 | 暗青 | 微信, QQ, 钉钉, Telegram... |
-| ⚙️ 系统工具 | 暗绿 | 设置, 驱动, 终端, 压缩... |
-| 🎮 游戏 | 暗橙 | Steam, Epic, 游戏启动器... |
-| 🎨 设计创意 | 暗粉 | PS, AI, Figma, Blender... |
-| 📦 其他 | 灰色 | 未分类应用 |
+| 类别 | 包含应用 |
+|---|---|
+| 🌐 浏览器 | Chrome, Edge, Firefox, Safari... |
+| 📄 办公软件 | Office, WPS, PDF 阅读器... |
+| 💻 开发工具 | VS Code, PyCharm, Git... |
+| 🎬 影音娱乐 | 播放器, 音乐, 直播... |
+| 💬 社交通讯 | 微信, QQ, 钉钉, Telegram... |
+| ⚙️ 系统工具 | 设置, 驱动, 终端, 压缩... |
+| 🎮 游戏 | Steam, Epic, 游戏启动器... |
+| 🎨 设计创意 | PS, AI, Figma, Blender... |
+| 📦 其他 | 未分类应用 |
 
 ---
 
