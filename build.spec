@@ -1,55 +1,62 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller 单文件打包配置
-生成单个可执行文件，内嵌字体资源
+桌面图标整理工具 PyInstaller 打包配置
 """
 
 import os
 
-base_dir = os.path.abspath('.')
+block_cipher = None
 
 a = Analysis(
     ['main.py'],
-    pathex=[base_dir],
+    pathex=[],
     binaries=[],
     datas=[
-        ('PingFang SC.ttf', '.'),
-        ('app.ico', '.'),
+        ('PingFang SC.ttf', '.'),  # 打包字体文件
     ],
     hiddenimports=[
         'customtkinter',
-        'PIL._tkinter_finder',
+        'PIL',
+        'PIL.Image',
+        'PIL.ImageDraw',
+        'PIL.ImageFont',
+        'win32api',
+        'win32con',
+        'win32gui',
+        'psutil',
+        'requests',
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[
-        'matplotlib', 'numpy', 'scipy', 'pandas',
-        'pytest', 'IPython', 'jupyter', 'notebook',
-    ],
+    excludes=[],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
     noarchive=False,
 )
 
-pyz = PYZ(a.pure)
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
+    a.zipfiles,
     a.datas,
     [],
     name='DesktopIconOrganizer',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=False,           # 可改为 True 启用压缩（减小体积但启动更慢）
+    upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
-    console=False,       # 不显示控制台窗口
+    console=False,  # 不显示控制台窗口
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='app.ico',
+    icon='app.ico',  # 软件图标（相对路径）
 )

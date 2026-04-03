@@ -41,7 +41,17 @@ from backup_manager import (
     delete_layout,
     get_latest_backup,
 )
-from desktop_overlay import show_desktop_overlay, hide_desktop_overlay, is_overlay_running
+from desktop_overlay import (
+    show_desktop_overlay,
+    hide_desktop_overlay,
+    is_overlay_running,
+    is_autostart_enabled,
+    enable_autostart,
+    disable_autostart,
+    save_persistent_layout,
+    has_persistent_layout,
+    clear_persistent_layout,
+)
 from preview_canvas import DragDropPreviewCanvas
 
 
@@ -203,6 +213,9 @@ class MainApp(ctk.CTk):
         # 启动后检测叠加层状态（延迟执行，避免阻塞界面初始化）
         self.after(1000, self._check_overlay_state)
 
+        # 绑定窗口关闭事件，确保子进程退出
+        self.protocol("WM_DELETE_WINDOW", self._on_closing)
+
     def _build_ui(self):
         """构建完整 UI"""
         # ====== 标题栏 ======
@@ -352,6 +365,25 @@ class MainApp(ctk.CTk):
             card.pack(fill="x", pady=2)
             self._category_cards[cat] = card
 
+        # 备份管理区域（放在类别卡片下方）
+        self._backup_section = ctk.CTkFrame(self._category_container, corner_radius=8, fg_color=COLORS["card"])
+        self._backup_section.pack(fill="x", pady=(12, 2))
+
+        ctk.CTkLabel(
+            self._backup_section, text="备份管理",
+            font=(FONT_FAMILY, 11, "bold"),
+            text_color=COLORS["text_primary"],
+            anchor="w",
+        ).pack(fill="x", padx=8, pady=(8, 4))
+
+        ToolButton(
+            self._backup_section, text="📋 备份列表", command=self._show_backup_list, width=180, height=28,
+        ).pack(fill="x", padx=6, pady=2)
+
+        ToolButton(
+            self._backup_section, text="📊 布局列表", command=self._show_layout_list, width=180, height=28,
+        ).pack(fill="x", padx=6, pady=(2, 8))
+
         # 统计信息
         self._stats_frame = ctk.CTkFrame(left_panel, height=50, corner_radius=0, fg_color=COLORS["header"])
         self._stats_frame.pack(fill="x", side="bottom", padx=0, pady=0)
@@ -442,94 +474,95 @@ class MainApp(ctk.CTk):
         )
         self._detail_container.pack(fill="both", expand=True, padx=8, pady=8)
 
-        # 图标预览
-        self._icon_preview_frame = ctk.CTkFrame(self._detail_container, corner_radius=12, fg_color=COLORS["card"])
-        self._icon_preview_frame.pack(fill="x", pady=(0, 8))
+        # 图标预览（紧凑型）
+        self._icon_preview_frame = ctk.CTkFrame(self._detail_container, corner_radius=8, fg_color=COLORS["card"])
+        self._icon_preview_frame.pack(fill="x", pady=(0, 4))
 
         self._icon_image_label = ctk.CTkLabel(
             self._icon_preview_frame, text="?",
-            font=(FONT_FAMILY, 32, "bold"),
+            font=(FONT_FAMILY, 18, "bold"),
             text_color=COLORS["text_secondary"],
-            width=80, height=80,
+            width=40, height=40,
         )
-        self._icon_image_label.pack(pady=12)
+        self._icon_image_label.pack(pady=6)
 
         self._icon_name_label = ctk.CTkLabel(
             self._icon_preview_frame, text="未选择图标",
-            font=(FONT_FAMILY, 12, "bold"),
+            font=(FONT_FAMILY, 10, "bold"),
             text_color=COLORS["text_primary"],
-            wraplength=200,
+            wraplength=180,
         )
-        self._icon_name_label.pack(pady=(0, 4))
+        self._icon_name_label.pack(pady=(0, 2))
 
         self._icon_path_label = ctk.CTkLabel(
             self._icon_preview_frame, text="",
-            font=(FONT_FAMILY, 9),
+            font=(FONT_FAMILY, 8),
             text_color=COLORS["text_secondary"],
-            wraplength=200,
+            wraplength=180,
         )
-        self._icon_path_label.pack(pady=(0, 12))
+        self._icon_path_label.pack(pady=(0, 6))
 
-        # 属性区域
-        self._props_frame = ctk.CTkFrame(self._detail_container, corner_radius=12, fg_color=COLORS["card"])
-        self._props_frame.pack(fill="x", pady=(0, 8))
+        # 属性区域（紧凑型）
+        self._props_frame = ctk.CTkFrame(self._detail_container, corner_radius=8, fg_color=COLORS["card"])
+        self._props_frame.pack(fill="x", pady=(0, 4))
 
         ctk.CTkLabel(
             self._props_frame, text="属性",
-            font=(FONT_FAMILY, 12, "bold"),
+            font=(FONT_FAMILY, 10, "bold"),
             text_color=COLORS["text_primary"],
             anchor="w",
-        ).pack(fill="x", padx=12, pady=(10, 4))
+        ).pack(fill="x", padx=8, pady=(6, 2))
 
         # 类别
         cat_row = ctk.CTkFrame(self._props_frame, fg_color="transparent")
-        cat_row.pack(fill="x", padx=12, pady=4)
+        cat_row.pack(fill="x", padx=8, pady=1)
 
-        ctk.CTkLabel(cat_row, text="类别:", font=(FONT_FAMILY, 11),
+        ctk.CTkLabel(cat_row, text="类别:", font=(FONT_FAMILY, 9),
                       text_color=COLORS["text_secondary"]).pack(side="left")
 
         self._category_value_label = ctk.CTkLabel(
-            cat_row, text="—", font=(FONT_FAMILY, 11),
+            cat_row, text="—", font=(FONT_FAMILY, 9),
             text_color=COLORS["text_primary"], anchor="e",
         )
         self._category_value_label.pack(side="right")
 
         # 位置
         pos_row = ctk.CTkFrame(self._props_frame, fg_color="transparent")
-        pos_row.pack(fill="x", padx=12, pady=4)
+        pos_row.pack(fill="x", padx=8, pady=1)
 
-        ctk.CTkLabel(pos_row, text="位置:", font=(FONT_FAMILY, 11),
+        ctk.CTkLabel(pos_row, text="位置:", font=(FONT_FAMILY, 9),
                       text_color=COLORS["text_secondary"]).pack(side="left")
 
         self._position_value_label = ctk.CTkLabel(
-            pos_row, text="—", font=(FONT_FAMILY, 11),
+            pos_row, text="—", font=(FONT_FAMILY, 9),
             text_color=COLORS["text_primary"], anchor="e",
         )
         self._position_value_label.pack(side="right")
 
         # 索引
         idx_row = ctk.CTkFrame(self._props_frame, fg_color="transparent")
-        idx_row.pack(fill="x", padx=12, pady=4)
+        idx_row.pack(fill="x", padx=8, pady=1)
 
-        ctk.CTkLabel(idx_row, text="索引:", font=(FONT_FAMILY, 11),
+        ctk.CTkLabel(idx_row, text="索引:", font=(FONT_FAMILY, 9),
                       text_color=COLORS["text_secondary"]).pack(side="left")
 
         self._index_value_label = ctk.CTkLabel(
-            idx_row, text="—", font=(FONT_FAMILY, 11),
+            idx_row, text="—", font=(FONT_FAMILY, 9),
             text_color=COLORS["text_primary"], anchor="e",
         )
         self._index_value_label.pack(side="right")
 
         # 类别修改下拉框
         cat_change_row = ctk.CTkFrame(self._props_frame, fg_color="transparent")
-        cat_change_row.pack(fill="x", padx=12, pady=(4, 10))
+        cat_change_row.pack(fill="x", padx=8, pady=(2, 6))
 
-        ctk.CTkLabel(cat_change_row, text="更改类别:", font=(FONT_FAMILY, 10),
-                      text_color=COLORS["text_secondary"]).pack(fill="x", pady=(0, 4))
+        ctk.CTkLabel(cat_change_row, text="更改类别:", font=(FONT_FAMILY, 9),
+                      text_color=COLORS["text_secondary"]).pack(fill="x", pady=(0, 2))
 
         self._category_option = ctk.CTkOptionMenu(
             cat_change_row, values=CATEGORIES,
-            font=(FONT_FAMILY, 10),
+            font=(FONT_FAMILY, 9),
+            height=24,
             fg_color=COLORS["bg_dark"],
             button_color=COLORS["bg_light"],
             button_hover_color=COLORS["accent2"],
@@ -541,41 +574,63 @@ class MainApp(ctk.CTk):
         self._category_option.configure(command=self._change_icon_category)
 
         # ====== 操作按钮区 ======
-        actions_frame = ctk.CTkFrame(self._detail_container, corner_radius=12, fg_color=COLORS["card"])
-        actions_frame.pack(fill="x", pady=(0, 8))
+        actions_frame = ctk.CTkFrame(self._detail_container, corner_radius=8, fg_color=COLORS["card"])
+        actions_frame.pack(fill="x", pady=(0, 4))
 
         ActionButton(
             actions_frame, text="🚀  应用布局到桌面",
             command=self._apply_layout,
             color="accent2",
-        ).pack(fill="x", padx=10, pady=(10, 4))
+        ).pack(fill="x", padx=8, pady=(8, 3))
 
         ActionButton(
             actions_frame, text="🔄  重新生成布局",
             command=self._regenerate_layout,
             color="warning",
-        ).pack(fill="x", padx=10, pady=(4, 10))
+        ).pack(fill="x", padx=8, pady=(3, 8))
 
-        # 备份管理
-        backup_frame = ctk.CTkFrame(self._detail_container, corner_radius=12, fg_color=COLORS["card"])
-        backup_frame.pack(fill="x", pady=(0, 8))
+        # 持久化设置（紧随操作按钮）
+        persist_frame = ctk.CTkFrame(self._detail_container, corner_radius=8, fg_color=COLORS["card"])
+        persist_frame.pack(fill="x", pady=(0, 4))
 
         ctk.CTkLabel(
-            backup_frame, text="备份管理",
-            font=(FONT_FAMILY, 12, "bold"),
+            persist_frame, text="持久化设置",
+            font=(FONT_FAMILY, 10, "bold"),
             text_color=COLORS["text_primary"],
             anchor="w",
-        ).pack(fill="x", padx=12, pady=(10, 4))
+        ).pack(fill="x", padx=8, pady=(6, 2))
+
+        # 开机自启动开关
+        autostart_row = ctk.CTkFrame(persist_frame, fg_color="transparent")
+        autostart_row.pack(fill="x", padx=8, pady=2)
+
+        ctk.CTkLabel(
+            autostart_row, text="开机自启动:",
+            font=(FONT_FAMILY, 9),
+            text_color=COLORS["text_secondary"],
+        ).pack(side="left")
+
+        self._autostart_var = ctk.BooleanVar(value=is_autostart_enabled())
+        self._autostart_switch = ctk.CTkSwitch(
+            autostart_row,
+            text="",
+            variable=self._autostart_var,
+            command=self._toggle_autostart,
+            width=50,
+        )
+        self._autostart_switch.pack(side="right")
 
         ActionButton(
-            backup_frame, text="📋  查看备份列表",
-            command=self._show_backup_list,
-        ).pack(fill="x", padx=10, pady=(4, 4))
+            persist_frame, text="💾  保存持久化布局",
+            command=self._save_persistent_layout,
+            color="success",
+        ).pack(fill="x", padx=8, pady=(2, 2))
 
         ActionButton(
-            backup_frame, text="📊  查看布局列表",
-            command=self._show_layout_list,
-        ).pack(fill="x", padx=10, pady=(4, 10))
+            persist_frame, text="🗑️  清除持久化布局",
+            command=self._clear_persistent_layout,
+            color="danger",
+        ).pack(fill="x", padx=8, pady=(2, 6))
 
     def _build_status_bar(self):
         """底部状态栏"""
@@ -796,12 +851,15 @@ class MainApp(ctk.CTk):
             text=icon.category,
             text_color=CATEGORY_COLORS.get(icon.category, COLORS["text_primary"]),
         )
-        self._position_value_label.configure(text=f"({icon.x}, {icon.y})")
         self._index_value_label.configure(text=str(icon.index))
+
+        # 从布局中获取图标的新位置（预览中的位置）
+        layout_pos = self._find_layout_position(icon_name)
+        self._position_value_label.configure(text=f"({layout_pos[0]}, {layout_pos[1]})")
 
         # 图标预览
         if icon.image:
-            ctk_image = ctk.CTkImage(light_image=icon.image, dark_image=icon.image, size=(64, 64))
+            ctk_image = ctk.CTkImage(light_image=icon.image, dark_image=icon.image, size=(32, 32))
             self._icon_image_label.configure(image=ctk_image, text="")
             self._icon_image_label._ctk_image = ctk_image  # 防止 GC
         else:
@@ -810,6 +868,15 @@ class MainApp(ctk.CTk):
 
         # 设置类别下拉框
         self._category_option.set(icon.category)
+
+    def _find_layout_position(self, icon_name: str) -> tuple:
+        """从布局中查找图标的新位置"""
+        if not self._layout:
+            return (0, 0)
+        for cell in self._layout.cells:
+            if cell.icon and cell.icon.name == icon_name:
+                return (cell.pixel_x, cell.pixel_y)
+        return (0, 0)
 
     def _find_icon_by_name(self, name: str) -> DesktopIcon | None:
         """按名称查找图标"""
@@ -911,6 +978,54 @@ class MainApp(ctk.CTk):
 
         self._generate_and_show_layout()
         self._set_status("布局已重新生成")
+
+    def _toggle_autostart(self):
+        """切换开机自启动"""
+        if self._autostart_var.get():
+            if enable_autostart():
+                self._set_status("已启用开机自启动")
+            else:
+                self._autostart_var.set(False)
+                messagebox.showerror("错误", "启用开机自启动失败")
+        else:
+            if disable_autostart():
+                self._set_status("已禁用开机自启动")
+            else:
+                self._autostart_var.set(True)
+                messagebox.showerror("错误", "禁用开机自启动失败")
+
+    def _save_persistent_layout(self):
+        """保存持久化布局（开机后自动恢复）"""
+        if not self._layout:
+            messagebox.showinfo("提示", "请先生成布局")
+            return
+
+        # 收集图标位置
+        icon_positions = []
+        for icon in self._icons:
+            icon_positions.append({
+                "name": icon.name,
+                "x": icon.x,
+                "y": icon.y,
+            })
+
+        # 保存持久化布局
+        if save_persistent_layout(self._layout, self._desktop_info.dpi_scale, icon_positions):
+            self._set_status("持久化布局已保存 | 开机后将自动恢复")
+            messagebox.showinfo("成功", "持久化布局已保存！\n\n开机后将自动恢复叠加层和图标位置。")
+        else:
+            messagebox.showerror("错误", "保存持久化布局失败")
+
+    def _clear_persistent_layout(self):
+        """清除持久化布局"""
+        if not has_persistent_layout():
+            messagebox.showinfo("提示", "没有保存的持久化布局")
+            return
+
+        if messagebox.askyesno("确认", "确定要清除持久化布局吗？\n\n清除后开机将不再自动恢复叠加层。"):
+            clear_persistent_layout()
+            self._set_status("已清除持久化布局")
+            messagebox.showinfo("成功", "持久化布局已清除")
 
     def _check_overlay_state(self):
         """启动时检测是否有叠加层进程正在运行，同步按钮状态"""
@@ -1397,7 +1512,8 @@ class MainApp(ctk.CTk):
         ).pack(pady=8)
 
     def _on_closing(self):
-        """窗口关闭时保留叠加层在桌面"""
+        """窗口关闭时保留叠加层继续运行"""
+        # 叠加层保持显示，不关闭子进程
         self.destroy()
 
 
@@ -1406,6 +1522,12 @@ class MainApp(ctk.CTk):
 if __name__ == "__main__":
     # 支持 --overlay 参数，用于 PyInstaller 打包后的子进程模式
     if len(sys.argv) > 1 and sys.argv[1] == "--overlay":
+        import overlay_process
+        overlay_process.main()
+        sys.exit(0)
+
+    # 支持 --autostart 参数，用于开机自启动显示叠加层
+    if len(sys.argv) > 1 and sys.argv[1] == "--autostart":
         import overlay_process
         overlay_process.main()
         sys.exit(0)

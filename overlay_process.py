@@ -349,6 +349,10 @@ def _run_overlay(hwnd, control_file, pid_file):
 
 
 def main():
+    """叠加层主函数"""
+    # 检查是否是开机自启动模式
+    autostart_mode = "--autostart" in sys.argv
+
     # PyInstaller 打包模式：控制文件放在 exe 所在目录
     # 开发模式：控制文件放在脚本所在目录
     if getattr(sys, 'frozen', False):
@@ -357,17 +361,29 @@ def main():
         base_dir = os.path.dirname(os.path.abspath(__file__))
 
     layout_file = os.path.join(base_dir, ".overlay_layout.json")
+    persistent_layout_file = os.path.join(base_dir, "overlay_layout_persistent.json")
     control_file = os.path.join(base_dir, ".overlay_control.json")
     pid_file = os.path.join(base_dir, ".overlay_pid")
+    icon_positions_file = os.path.join(base_dir, "icon_positions.json")
+
+    # 开机自启动模式：使用持久化布局文件
+    if autostart_mode:
+        layout_file = persistent_layout_file
+        print("[Overlay] 开机自启动模式，加载持久化布局")
 
     if not os.path.exists(layout_file):
-        print("[Overlay] 布局文件不存在，退出")
+        print(f"[Overlay] 布局文件不存在: {layout_file}，退出")
         sys.exit(1)
 
     with open(layout_file, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     dpi_scale = data.get("dpi_scale", 1.0)
+
+    # 开机自启动模式：恢复图标位置
+    if autostart_mode and data.get("icon_positions"):
+        print("[Overlay] 正在恢复图标位置...")
+        _restore_icon_positions(data["icon_positions"])
 
     # 重建 DesktopLayout 对象，复用 desktop_overlay 的渲染逻辑
     layout = _rebuild_layout(data)
@@ -397,11 +413,15 @@ def main():
     while True:
         result = _run_overlay(hwnd, control_file, pid_file)
         if result == "update":
-            if not os.path.exists(layout_file):
+            # 更新时优先从临时布局文件读取
+            temp_layout_file = os.path.join(base_dir, ".overlay_layout.json")
+            update_file = temp_layout_file if os.path.exists(temp_layout_file) else layout_file
+
+            if not os.path.exists(update_file):
                 print("[Overlay] 布局文件已删除，退出")
                 break
             try:
-                with open(layout_file, "r", encoding="utf-8") as f:
+                with open(update_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 dpi_scale = data.get("dpi_scale", 1.0)
                 layout = _rebuild_layout(data)
@@ -445,14 +465,50 @@ def main():
         else:
             break
 
-    # 清理临时文件
-    for fp in [pid_file, control_file, layout_file]:
+    # 清理临时文件（不清理持久化布局文件）
+    for fp in [pid_file, control_file]:
         try:
             if os.path.exists(fp):
                 os.remove(fp)
         except Exception:
             pass
+    # 只清理临时布局文件，不清理持久化布局
+    temp_layout = os.path.join(base_dir, ".overlay_layout.json")
+    try:
+        if os.path.exists(temp_layout):
+            os.remove(temp_layout)
+    except Exception:
+        pass
     print("[Overlay] 进程退出")
+
+
+def _restore_icon_positions(positions: list):
+    """恢复图标位置"""
+    try:
+        # 延迟导入避免循环依赖
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from desktop_scanner import find_desktop_listview, set_icon_position, scan_all_icons
+
+        # 扫描当前桌面获取索引映射
+        current_icons = scan_all_icons(extract_images=False)
+        name_to_index = {icon.name: icon.index for icon in current_icons}
+
+        hwnd = find_desktop_listview()
+        if not hwnd:
+            print("[Overlay] 无法找到桌面窗口")
+            return
+
+        restored = 0
+        for pos in positions:
+            name = pos.get("name")
+            x, y = pos.get("x"), pos.get("y")
+            if name in name_to_index:
+                set_icon_position(hwnd, name_to_index[name], x, y)
+                restored += 1
+
+        print(f"[Overlay] 已恢复 {restored} 个图标位置")
+    except Exception as e:
+        print(f"[Overlay] 恢复图标位置失败: {e}")
 
 
 if __name__ == "__main__":

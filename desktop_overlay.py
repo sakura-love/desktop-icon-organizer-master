@@ -24,9 +24,11 @@ else:
     _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 _LAYOUT_FILE = os.path.join(_BASE_DIR, ".overlay_layout.json")
+_PERSISTENT_LAYOUT_FILE = os.path.join(_BASE_DIR, "overlay_layout_persistent.json")  # 持久化布局文件
 _CONTROL_FILE = os.path.join(_BASE_DIR, ".overlay_control.json")
 _PID_FILE = os.path.join(_BASE_DIR, ".overlay_pid")
 _OVERLAY_SCRIPT = os.path.join(_BASE_DIR, "overlay_process.py")
+_ICON_POSITIONS_FILE = os.path.join(_BASE_DIR, "icon_positions.json")  # 持久化图标位置
 
 # 检测是否在 PyInstaller 打包模式下运行
 _FROZEN = getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS')
@@ -296,20 +298,29 @@ class DesktopOverlay:
             else:
                 cmd = [sys.executable, _OVERLAY_SCRIPT]
 
+            # 开发模式下显示窗口以便调试
+            if _FROZEN:
+                creation_flags = subprocess.CREATE_NO_WINDOW
+            else:
+                creation_flags = 0  # 开发模式显示控制台窗口便于调试
+
             self._process = subprocess.Popen(
                 cmd,
                 cwd=_BASE_DIR,
-                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+                creationflags=creation_flags,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
             self._started_by_us = True
+            print(f"[Overlay] 启动命令: {cmd}")
             # 短暂等待检查进程是否立即崩溃
             try:
                 self._process.wait(timeout=2.0)
                 # 进程退出了，说明有错误
+                stdout = self._process.stdout.read().decode("utf-8", errors="replace") if self._process.stdout else ""
                 stderr = self._process.stderr.read().decode("utf-8", errors="replace") if self._process.stderr else ""
-                self._error = f"叠加层进程启动失败: {stderr}"
+                print(f"[Overlay] 进程立即退出, stdout={stdout}, stderr={stderr}")
+                self._error = f"叠加层进程启动失败:\nstdout: {stdout}\nstderr: {stderr}"
                 self._process = None
                 return False
             except subprocess.TimeoutExpired:
@@ -393,3 +404,128 @@ def hide_desktop_overlay():
             _write_control("stop")
         except Exception:
             pass
+
+
+# ===================== 开机自启动 =====================
+
+import winreg
+
+_AUTOSTART_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+_AUTOSTART_NAME = "DesktopIconOrganizerOverlay"
+
+
+def is_autostart_enabled() -> bool:
+    """检查是否已设置开机自启动"""
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, _AUTOSTART_KEY, 0, winreg.KEY_READ)
+        winreg.QueryValueEx(key, _AUTOSTART_NAME)
+        winreg.CloseKey(key)
+        return True
+    except (FileNotFoundError, OSError):
+        return False
+
+
+def enable_autostart():
+    """启用开机自启动"""
+    if _FROZEN:
+        exe_path = sys.executable
+    else:
+        # 开发模式：创建一个启动脚本
+        exe_path = sys.executable
+
+    # 构建启动命令
+    if _FROZEN:
+        cmd = f'"{exe_path}" --autostart'
+    else:
+        script_path = os.path.join(_BASE_DIR, "overlay_process.py")
+        cmd = f'"{exe_path}" "{script_path}" --autostart'
+
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, _AUTOSTART_KEY, 0, winreg.KEY_WRITE)
+        winreg.SetValueEx(key, _AUTOSTART_NAME, 0, winreg.REG_SZ, cmd)
+        winreg.CloseKey(key)
+        print(f"[Autostart] 已启用开机自启动: {cmd}")
+        return True
+    except Exception as e:
+        print(f"[Autostart] 启用开机自启动失败: {e}")
+        return False
+
+
+def disable_autostart():
+    """禁用开机自启动"""
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, _AUTOSTART_KEY, 0, winreg.KEY_WRITE)
+        winreg.DeleteValue(key, _AUTOSTART_NAME)
+        winreg.CloseKey(key)
+        print("[Autostart] 已禁用开机自启动")
+        return True
+    except (FileNotFoundError, OSError):
+        return True
+    except Exception as e:
+        print(f"[Autostart] 禁用开机自启动失败: {e}")
+        return False
+
+
+# ===================== 布局持久化 =====================
+
+def save_persistent_layout(layout: DesktopLayout, dpi_scale: float, icon_positions: list = None):
+    """保存布局到持久化文件（开机后自动加载）"""
+    data = {
+        "total_width": layout.total_width,
+        "total_height": layout.total_height,
+        "cell_height": layout.cell_height,
+        "dpi_scale": dpi_scale,
+        "categories": [],
+        "cells": [],
+        "icon_positions": icon_positions or [],
+    }
+    for cat in layout.category_layouts:
+        data["categories"].append({
+            "category": cat.category,
+            "column_width": cat.column_width,
+        })
+    for cell in layout.cells:
+        data["cells"].append({
+            "pixel_x": cell.pixel_x,
+            "pixel_y": cell.pixel_y,
+            "category": cell.category,
+            "is_header": cell.is_header,
+        })
+    try:
+        with open(_PERSISTENT_LAYOUT_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"[Persistence] 布局已持久化保存: {_PERSISTENT_LAYOUT_FILE}")
+        return True
+    except Exception as e:
+        print(f"[Persistence] 保存布局失败: {e}")
+        return False
+
+
+def load_persistent_layout():
+    """加载持久化的布局数据"""
+    try:
+        with open(_PERSISTENT_LAYOUT_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        print(f"[Persistence] 已加载持久化布局")
+        return data
+    except FileNotFoundError:
+        return None
+    except Exception as e:
+        print(f"[Persistence] 加载布局失败: {e}")
+        return None
+
+
+def has_persistent_layout() -> bool:
+    """检查是否存在持久化布局"""
+    return os.path.exists(_PERSISTENT_LAYOUT_FILE)
+
+
+def clear_persistent_layout():
+    """清除持久化布局"""
+    for fp in [_PERSISTENT_LAYOUT_FILE, _ICON_POSITIONS_FILE]:
+        try:
+            if os.path.exists(fp):
+                os.remove(fp)
+        except Exception:
+            pass
+    print("[Persistence] 已清除持久化布局")
