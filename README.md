@@ -98,7 +98,20 @@ python -m PyInstaller build.spec --clean --noconfirm
 
 ## 📸 截图预览
 
-> _截图展示主界面、分类预览、桌面叠加层效果_
+### 1. 原始桌面
+![原始桌面](screenshots/1.png)
+
+### 2. 软件主界面
+![软件主界面](screenshots/2.png)
+
+### 3. 布局预览
+![布局预览](screenshots/3.png)
+
+### 4. 应用到桌面
+![应用到桌面](screenshots/4.png)
+
+### 5. 分类边框叠加层
+![分类边框叠加层](screenshots/5.png)
 
 ---
 
