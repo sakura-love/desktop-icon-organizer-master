@@ -686,6 +686,9 @@ class MainApp(ctk.CTk):
 
     def _on_scan_complete(self, icons: list[DesktopIcon]):
         """扫描完成回调"""
+        # 重新扫描后必须重置分类和布局状态，避免引用旧数据
+        self._classified = {}
+        self._layout = None
         self._set_status(f"扫描完成 | 共找到 {len(icons)} 个图标")
         self._set_progress(1.0)
         self._update_category_cards()
@@ -756,6 +759,7 @@ class MainApp(ctk.CTk):
 
     def _show_empty_preview(self):
         """显示空预览提示"""
+        self._layout = None
         self._preview_canvas.delete("all")
         cw = self._preview_canvas.winfo_width() or 800
         ch = self._preview_canvas.winfo_height() or 600
@@ -808,8 +812,7 @@ class MainApp(ctk.CTk):
 
             self._rebuild_classified_from_layout()
             self._update_category_cards()
-
-        self._set_status(f"已交换: {src_name} ↔ {dst_name}")
+            self._set_status(f"已交换: {src_name} ↔ {dst_name}")
 
     def _rebuild_classified_from_layout(self):
         """从布局重建分类字典"""
@@ -1009,14 +1012,15 @@ class MainApp(ctk.CTk):
             messagebox.showinfo("提示", "请先生成布局")
             return
 
-        # 收集图标位置
+        # 收集图标位置（使用布局计算后的组织位置，而非原始扫描位置）
         icon_positions = []
-        for icon in self._icons:
-            icon_positions.append({
-                "name": icon.name,
-                "x": icon.x,
-                "y": icon.y,
-            })
+        for cell in self._layout.cells:
+            if cell.icon and not cell.is_header:
+                icon_positions.append({
+                    "name": cell.icon.name,
+                    "x": cell.pixel_x,
+                    "y": cell.pixel_y,
+                })
 
         # 保存持久化布局
         if save_persistent_layout(self._layout, self._desktop_info.dpi_scale, icon_positions):
@@ -1054,7 +1058,7 @@ class MainApp(ctk.CTk):
             self._hide_overlay_btn.configure(state="normal", fg_color=COLORS["card"])
         else:
             self._show_overlay_btn.configure(state="normal", fg_color=COLORS["card"])
-            self._hide_overlay_btn.configure(state="normal", fg_color=COLORS["card"])
+            self._hide_overlay_btn.configure(state="disabled", fg_color="#333355")
 
     def _show_overlay(self):
         """显示桌面叠加层"""
@@ -1064,15 +1068,16 @@ class MainApp(ctk.CTk):
         self._set_status("正在显示边框...")
         self.update_idletasks()
         try:
-            # 收集图标位置用于熄屏唤醒后恢复
+            # 收集图标位置（使用布局计算后的组织位置，而非原始扫描位置）
             icon_positions = []
-            if self._icons:
-                for icon in self._icons:
-                    icon_positions.append({
-                        "name": icon.name,
-                        "x": icon.x,
-                        "y": icon.y,
-                    })
+            if self._layout:
+                for cell in self._layout.cells:
+                    if cell.icon and not cell.is_header:
+                        icon_positions.append({
+                            "name": cell.icon.name,
+                            "x": cell.pixel_x,
+                            "y": cell.pixel_y,
+                        })
             show_desktop_overlay(self._layout, self._desktop_info.dpi_scale, root=self, icon_positions=icon_positions)
             self._overlay_shown = True
             self._update_overlay_buttons()
@@ -1090,8 +1095,11 @@ class MainApp(ctk.CTk):
 
     def _backup_desktop(self):
         """备份当前桌面布局"""
+        if self._processing:
+            return
         if not self._icons:
             # 即使没有扫描过也尝试备份
+            self._processing = True
             self._set_status("正在备份桌面...")
             def worker():
                 try:
@@ -1102,6 +1110,8 @@ class MainApp(ctk.CTk):
                     self.after(0, lambda: messagebox.showinfo("成功", f"桌面布局已备份！\n{filepath}"))
                 except Exception as e:
                     self.after(0, lambda: self._on_error(f"备份失败: {e}"))
+                finally:
+                    self.after(0, lambda: setattr(self, '_processing', False))
             threading.Thread(target=worker, daemon=True).start()
             return
 
