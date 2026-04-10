@@ -264,22 +264,22 @@ def get_header_pixel_position(cell: Cell, layout: DesktopLayout) -> Tuple[int, i
     return cell.pixel_x, cell.pixel_y
 
 
-def layout_to_icon_list(layout: DesktopLayout) -> List[Tuple[int, int, int]]:
+def layout_to_icon_list(layout: DesktopLayout) -> List[Tuple[str, int, int]]:
     """
     将布局转换为图标位置列表
-    返回: [(original_index, new_x, new_y), ...]
+    返回: [(icon_name, new_x, new_y), ...]
+    使用图标名称而非索引，确保桌面变化后仍能正确匹配
     坐标为物理像素，每个图标有独立 cell，位置互不重叠
     """
     positions = []
     for cell in layout.cells:
         if cell.icon and not cell.is_header:
             # 图标在 cell 内水平居中，垂直偏移少量
-            # ICON_SIZE 是逻辑尺寸(48px at 96dpi)，实际物理尺寸需按 cell_width 比例估算
-            offset_x = layout.cell_width // 4  # 约 cell_width/4 ≈ (cell_width - icon_phys_size)/2
+            offset_x = layout.cell_width // 4
             offset_y = max(2, layout.cell_height // 10)
             px = cell.pixel_x + offset_x
             py = cell.pixel_y + offset_y
-            positions.append((cell.icon.index, px, py))
+            positions.append((cell.icon.name, px, py))
     return positions
 
 

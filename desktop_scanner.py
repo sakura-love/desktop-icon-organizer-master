@@ -489,14 +489,31 @@ def scan_all_icons(extract_images: bool = True) -> List[DesktopIcon]:
     return icons
 
 
-def apply_icon_positions(icon_positions: List[Tuple[int, int, int]]):
-    """应用图标位置到桌面"""
+def apply_icon_positions(icon_positions: List[Tuple[str, int, int]]):
+    """应用图标位置到桌面（基于图标名称实时匹配索引）"""
     hwnd = find_desktop_listview()
     if not hwnd:
         raise RuntimeError("无法找到桌面 ListView 窗口")
 
-    for index, x, y in icon_positions:
-        set_icon_position(hwnd, index, x, y)
+    # 实时扫描桌面获取当前名称->索引映射，避免使用过时的索引
+    current_icons = scan_all_icons(extract_images=False)
+    name_to_index = {}
+    for icon in current_icons:
+        # 处理同名图标：按出现顺序保留最新索引
+        name_to_index[icon.name] = icon.index
+
+    applied = 0
+    skipped = 0
+    for name, x, y in icon_positions:
+        if name in name_to_index:
+            set_icon_position(hwnd, name_to_index[name], x, y)
+            applied += 1
+        else:
+            skipped += 1
+            print(f"[Apply] 跳过不存在的图标: {name}")
+
+    print(f"[Apply] 已应用 {applied} 个图标位置，跳过 {skipped} 个")
+    return applied, skipped
 
 
 if __name__ == "__main__":

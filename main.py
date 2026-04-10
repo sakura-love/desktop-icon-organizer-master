@@ -1337,6 +1337,20 @@ class MainApp(ctk.CTk):
             messagebox.showerror("错误", "无法加载布局文件")
             return
 
+        # 确保已扫描桌面，否则无法匹配图标名称
+        if not self._icons:
+            self._scan_desktop()
+            self._set_status("正在扫描桌面以加载布局...")
+            # 等待扫描完成（简单轮询，扫描通常很快）
+            import time
+            for _ in range(50):  # 最多等5秒
+                if self._icons or not self._processing:
+                    break
+                time.sleep(0.1)
+            if not self._icons:
+                messagebox.showerror("错误", "扫描桌面失败，无法加载布局")
+                return
+
         categories = data.get("categories", {})
         icon_info = data.get("icon_info", {})
 
