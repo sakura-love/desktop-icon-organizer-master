@@ -311,6 +311,7 @@ class DesktopOverlay:
                 creationflags=creation_flags,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                env={**os.environ, "PYINSTALLER_RESET_ENVIRONMENT": "1"} if _FROZEN else None,
             )
             self._started_by_us = True
             print(f"[Overlay] 启动命令: {cmd}")

@@ -96,6 +96,14 @@ python -m PyInstaller build.spec --clean --noconfirm
 
 ---
 
+## 🆕 最近更新（2026-04-13）
+
+- 修复打包版在应用布局后关闭主界面，偶发弹出 `Failed to remove temporary directory ... _MEIxxxxxx` 的问题。
+- 优化叠加层子进程启动环境（PyInstaller 模式下设置 `PYINSTALLER_RESET_ENVIRONMENT=1`），避免父子进程临时解压目录清理冲突。
+- 提升打包版退出稳定性，降低关闭后延迟报错概率。
+
+---
+
 ## 📸 截图预览
 
 ### 1. 原始桌面

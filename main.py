@@ -962,19 +962,21 @@ class MainApp(ctk.CTk):
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def _build_overlay_icon_positions(self):
+        """构建用于桌面恢复的图标位置数据"""
+        if not self._layout:
+            return []
+
+        return [
+            {"name": name, "x": x, "y": y}
+            for name, x, y in layout_to_icon_list(self._layout)
+        ]
+
     def _show_overlay_after_apply(self):
         """应用布局后重新显示叠加层"""
         if self._layout:
             try:
-                # 从布局中收集图标位置用于熄屏唤醒后恢复
-                icon_positions = []
-                for cell in self._layout.cells:
-                    if cell.icon and not cell.is_header:
-                        icon_positions.append({
-                            "name": cell.icon.name,
-                            "x": cell.pixel_x,
-                            "y": cell.pixel_y,
-                        })
+                icon_positions = self._build_overlay_icon_positions()
                 show_desktop_overlay(self._layout, self._desktop_info.dpi_scale, root=self, icon_positions=icon_positions)
                 self._overlay_shown = True
                 self._update_overlay_buttons()
@@ -1012,15 +1014,7 @@ class MainApp(ctk.CTk):
             messagebox.showinfo("提示", "请先生成布局")
             return
 
-        # 收集图标位置（使用布局计算后的组织位置，而非原始扫描位置）
-        icon_positions = []
-        for cell in self._layout.cells:
-            if cell.icon and not cell.is_header:
-                icon_positions.append({
-                    "name": cell.icon.name,
-                    "x": cell.pixel_x,
-                    "y": cell.pixel_y,
-                })
+        icon_positions = self._build_overlay_icon_positions()
 
         # 保存持久化布局
         if save_persistent_layout(self._layout, self._desktop_info.dpi_scale, icon_positions):
@@ -1068,16 +1062,7 @@ class MainApp(ctk.CTk):
         self._set_status("正在显示边框...")
         self.update_idletasks()
         try:
-            # 收集图标位置（使用布局计算后的组织位置，而非原始扫描位置）
-            icon_positions = []
-            if self._layout:
-                for cell in self._layout.cells:
-                    if cell.icon and not cell.is_header:
-                        icon_positions.append({
-                            "name": cell.icon.name,
-                            "x": cell.pixel_x,
-                            "y": cell.pixel_y,
-                        })
+            icon_positions = self._build_overlay_icon_positions()
             show_desktop_overlay(self._layout, self._desktop_info.dpi_scale, root=self, icon_positions=icon_positions)
             self._overlay_shown = True
             self._update_overlay_buttons()
@@ -1287,7 +1272,14 @@ class MainApp(ctk.CTk):
         list_frame = ctk.CTkScrollableFrame(dialog, fg_color="transparent")
         list_frame.pack(fill="both", expand=True, padx=16, pady=8)
 
-        selected = [None]
+        selected = {"filepath": None, "item": None}
+
+        def select(fp: str, item_widget):
+            if selected["item"] is not None:
+                selected["item"].configure(fg_color=COLORS["card"])
+            selected["filepath"] = fp
+            selected["item"] = item_widget
+            item_widget.configure(fg_color=COLORS["accent2"])
 
         for l in layouts:
             item = ctk.CTkFrame(list_frame, corner_radius=8, fg_color=COLORS["card"])
@@ -1297,25 +1289,25 @@ class MainApp(ctk.CTk):
             time_text = l.get("timestamp", "")[:19]
             cats = ", ".join(l.get("categories", [])[:4])
 
-            ctk.CTkLabel(
+            label = ctk.CTkLabel(
                 item,
                 text=f"  {name_text}  |  {cats}  |  {time_text}",
                 font=(FONT_FAMILY, 11),
                 text_color=COLORS["text_primary"],
                 anchor="w",
-            ).pack(fill="x", padx=8, pady=8)
+            )
+            label.pack(fill="x", padx=8, pady=8)
 
-            def select(fp=l["filepath"]):
-                selected[0] = fp
-                dialog.destroy()
-
-            item.bind("<Button-1>", lambda e, fp=l["filepath"]: select(fp))
+            click_handler = lambda e, fp=l["filepath"], item_widget=item: select(fp, item_widget)
+            item.bind("<Button-1>", click_handler)
+            label.bind("<Button-1>", click_handler)
 
         def do_load():
-            fp = selected[0]
-            dialog.destroy()
+            fp = selected["filepath"]
             if not fp:
+                messagebox.showinfo("提示", "请先选择一个布局方案", parent=dialog)
                 return
+            dialog.destroy()
             self._do_load_layout(fp)
 
         ctk.CTkButton(
