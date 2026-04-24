@@ -1,53 +1,61 @@
-﻿# Desktop Icon Organizer
+﻿<div align="center">
 
-A Windows desktop icon organization tool with scanning, automatic/online classification, visual layout preview, drag-to-adjust, overlay borders, backup/restore, and one-click apply.
+# Desktop Icon Organizer
 
-## Highlights
-- Desktop icon scanning based on Win32 ListView APIs.
-- Automatic classification (keyword + extension) and online fallback classification.
-- Interactive layout preview with drag-and-swap.
-- Category overlay borders rendered in a separate process.
-- Backup, restore, save layout, and load layout.
-- Persistent startup overlay restore support.
+**Turn a messy Windows desktop into a maintainable categorized layout in minutes.**
 
-## Recent Updates
+[![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D4?style=flat-square)](#)
+[![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square)](#)
+[![License](https://img.shields.io/badge/License-MIT-22C55E?style=flat-square)](LICENSE)
+[![Release](https://img.shields.io/badge/Release-v2.0-FF6B6B?style=flat-square)](#recent-updates)
 
-### v2.0 (2026-04-25)
-- Added persistent icon profile storage (`icon_profile.json`) after scan.
-- Classification results now persist icon category and layout position.
-- Manual category changes are persisted and take priority in future auto/online classification.
-- Added multiple overlay border styles:
-  - `rounded`
-  - `square`
-  - `corner`
-  - `bracket`
-- Border style selector now shows Chinese labels in UI.
-- Fixed overlay process duplication issue:
-  - enforce single-instance overlay behavior
-  - detect both source mode (`overlay_process.py`) and packaged mode (`--overlay`)
-  - clean stale duplicate overlay processes when needed
-- Updated build output name to `DesktopIconOrganizer_v2.0.exe`.
+中文文档: [README.md](README.md)
 
-### Previous Patch (2026-04-13)
-- Improved packaged runtime stability around temporary extraction cleanup.
-- Improved overlay subprocess startup environment isolation.
+</div>
+
+---
+
+## Why This Project
+
+Most desktop organizers can rearrange icons once, but they do not learn your preferences.
+
+This project is designed to:
+- auto-classify desktop icons
+- persist your manual category adjustments
+- keep future reorganizations aligned with your own rules
+
+---
+
+## Features
+
+| Feature | Description |
+|---|---|
+| Desktop scan | Uses Win32 ListView APIs to read icons, positions, and target paths |
+| Auto classification | Keyword + extension based classification |
+| Online classification | Optional online fallback when local rules are uncertain |
+| Manual-first behavior | Persisted manual category overrides are prioritized next time |
+| Visual preview | Drag-and-swap layout adjustments before apply |
+| Overlay border | Category border rendering in a standalone process |
+| Layout management | Backup, restore, save layout, load layout |
+
+---
 
 ## Screenshots
 
-![Original Desktop](screenshots/1.png)
 ![Main Window](screenshots/2.png)
-![Layout Preview](screenshots/3.png)
-![Apply Layout](screenshots/4.png)
-![Overlay Border](screenshots/5.png)
 
-## Requirements
-- Windows 10/11
-- Python 3.9+
-- Administrator privilege (recommended for reliable desktop icon operations)
+More screenshots:
+- [Original Desktop](screenshots/1.png)
+- [Layout Preview](screenshots/3.png)
+- [Apply Layout](screenshots/4.png)
+- [Overlay Border](screenshots/5.png)
+
+---
 
 ## Quick Start
 
-### Option A: Run from source
+### A) Run from source
+
 ```bash
 git clone https://github.com/sakura-love/desktop-icon-organizer-master.git
 cd desktop-icon-organizer-master
@@ -55,47 +63,117 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### Option B: Build executable
+### B) Build executable
+
 ```bash
 pip install pyinstaller
 python -m PyInstaller --clean --noconfirm build.spec
 ```
-Output executable:
+
+Output:
 - `dist/DesktopIconOrganizer_v2.0.exe`
 
-## Typical Workflow
-1. Scan desktop icons.
-2. Run automatic classification or online classification.
-3. Review in preview and drag icons if needed.
-4. Optionally modify category for specific icons (manual overrides are persisted).
-5. Select overlay border style and show overlay.
-6. Apply layout to desktop.
-7. Optionally save persistent layout / backups.
+---
 
-## Project Structure
-```text
-desktop-icon-organizer-master/
-├── main.py                   # Main GUI app
-├── desktop_scanner.py        # Desktop icon scan/apply module
-├── icon_classifier.py        # Classification engine
-├── icon_profile_store.py     # Persistent icon profile and manual overrides
-├── layout_engine.py          # Layout calculation
-├── preview_canvas.py         # Layout preview canvas
-├── desktop_overlay.py        # Overlay manager and renderer
-├── overlay_process.py        # Standalone overlay subprocess
-├── backup_manager.py         # Backup/layout management
-├── build.spec                # PyInstaller spec
-├── build.bat                 # Build helper script
-├── requirements.txt          # Python dependencies
-├── screenshots/              # README screenshots
-├── backups/                  # Backup files
-└── layouts/                  # Saved layout files
+## Typical Workflow
+
+1. Scan desktop icons
+2. Run auto classification or online classification
+3. Review and fine-tune with drag-and-swap preview
+4. Manually adjust specific categories (persisted)
+5. Select border style and show overlay
+6. Apply layout to desktop
+7. Save persistent layout/backups if needed
+
+---
+
+## Recent Updates
+
+### v2.0 (2026-04-25)
+- Added persistent icon profile file: `icon_profile.json`
+- Persist category and layout position for each icon
+- Persist manual category edits and prioritize them in future auto/online classification
+- Added overlay border styles:
+  - `rounded`
+  - `square`
+  - `corner`
+  - `bracket`
+- Border style selector now displays Chinese labels in UI
+- Fixed overlay duplication and multi-process issues:
+  - enforce single-instance overlay behavior
+  - detect both source mode (`overlay_process.py`) and packaged mode (`--overlay`)
+  - clean stale duplicate overlay processes automatically
+- Updated build output name to: `DesktopIconOrganizer_v2.0.exe`
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    A[main.py GUI] --> B[desktop_scanner.py Scan]
+    A --> C[icon_classifier.py Classify]
+    A --> D[layout_engine.py Layout]
+    A --> E[preview_canvas.py Preview]
+    A --> F[desktop_overlay.py Overlay Manager]
+    F --> G[overlay_process.py Standalone Overlay Process]
+    A --> H[icon_profile_store.py Persisted Profile + Manual Overrides]
+    A --> I[backup_manager.py Backup/Layout Schemes]
 ```
 
-## Notes
-- In packaged mode, overlay process runs via `--overlay`.
-- If overlay seems stale, use “Hide Border” and show again.
-- The repository may contain local build artifacts in `build/`, `dist/`, and `__pycache__/`.
+---
+
+## Key Data Files
+
+- `icon_profile.json`: icon scan info + manual category overrides
+- `layouts/*.json`: saved layout schemes
+- `backups/*.json`: backup snapshots
+- `overlay_layout_persistent.json`: persistent overlay layout state
+
+---
+
+## FAQ
+
+### Overlay did not refresh as expected
+Click “Hide Border” and then “Show Border” again.
+
+### Why run as Administrator
+Desktop icon positioning relies on system window messaging; admin mode improves stability.
+
+### How overlay starts in packaged mode
+Overlay subprocess is started with `--overlay`.
+
+---
+
+## Project Structure
+
+```text
+desktop-icon-organizer-master/
+├── main.py
+├── desktop_scanner.py
+├── icon_classifier.py
+├── icon_profile_store.py
+├── layout_engine.py
+├── preview_canvas.py
+├── desktop_overlay.py
+├── overlay_process.py
+├── backup_manager.py
+├── build.spec
+├── build.bat
+├── requirements.txt
+├── screenshots/
+├── backups/
+└── layouts/
+```
+
+---
+
+## Contributing
+
+Issues and PRs are welcome.
+
+---
 
 ## License
+
 MIT License. See [LICENSE](LICENSE).
