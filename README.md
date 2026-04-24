@@ -1,238 +1,101 @@
-<div align="center">
+﻿# Desktop Icon Organizer
 
-# 🖥️ Desktop Icon Organizer
+A Windows desktop icon organization tool with scanning, automatic/online classification, visual layout preview, drag-to-adjust, overlay borders, backup/restore, and one-click apply.
 
-**一款优雅的 Windows 桌面图标自动分类整理工具**
+## Highlights
+- Desktop icon scanning based on Win32 ListView APIs.
+- Automatic classification (keyword + extension) and online fallback classification.
+- Interactive layout preview with drag-and-swap.
+- Category overlay borders rendered in a separate process.
+- Backup, restore, save layout, and load layout.
+- Persistent startup overlay restore support.
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey.svg)](https://github.com/sakura-love/desktop-icon-organizer-master)
-[![Python](https://img.shields.io/badge/python-3.9%2B-yellow.svg)](https://www.python.org/)
+## Recent Updates
 
-[功能特性](#-功能特性) • [快速开始](#-快速开始) • [截图预览](#-截图预览) • [技术架构](#-技术架构)
+### v2.0 (2026-04-25)
+- Added persistent icon profile storage (`icon_profile.json`) after scan.
+- Classification results now persist icon category and layout position.
+- Manual category changes are persisted and take priority in future auto/online classification.
+- Added multiple overlay border styles:
+  - `rounded`
+  - `square`
+  - `corner`
+  - `bracket`
+- Border style selector now shows Chinese labels in UI.
+- Fixed overlay process duplication issue:
+  - enforce single-instance overlay behavior
+  - detect both source mode (`overlay_process.py`) and packaged mode (`--overlay`)
+  - clean stale duplicate overlay processes when needed
+- Updated build output name to `DesktopIconOrganizer_v2.0.exe`.
 
-</div>
+### Previous Patch (2026-04-13)
+- Improved packaged runtime stability around temporary extraction cleanup.
+- Improved overlay subprocess startup environment isolation.
 
----
+## Screenshots
 
-## ✨ 功能特性
+![Original Desktop](screenshots/1.png)
+![Main Window](screenshots/2.png)
+![Layout Preview](screenshots/3.png)
+![Apply Layout](screenshots/4.png)
+![Overlay Border](screenshots/5.png)
 
-<table>
-<tr>
-<td width="50%">
+## Requirements
+- Windows 10/11
+- Python 3.9+
+- Administrator privilege (recommended for reliable desktop icon operations)
 
-### 🤖 智能图标分类
+## Quick Start
 
-- **14 种预设类别** — 浏览器、办公、开发、游戏、社交通讯等
-- **多级分类策略** — 关键词匹配 → 扩展名推断 → 联网搜索
-- **DuckDuckGo 集成** — 无法识别的图标自动联网查询
-- **拖拽调整** — 可视化预览中自由调整图标位置
-
-</td>
-<td width="50%">
-
-### 🖥️ 桌面叠加层
-
-- **分类边框** — 在桌面显示半透明分类边框
-- **持久化显示** — 主程序退出后叠加层依然保持
-- **独立进程** — 叠加层运行于独立子进程，不影响主程序
-- **一键切换** — 显示/隐藏边框随时切换
-
-</td>
-</tr>
-<tr>
-<td width="50%">
-
-### 📐 布局管理
-
-- **实时预览** — 等比缩放显示布局效果
-- **一键应用** — Win32 API 直接操控桌面图标
-- **即时生效** — 无需重启资源管理器
-- **竖向分区** — 每个类别独立一列，整齐美观
-
-</td>
-<td width="50%">
-
-### 💾 备份与还原
-
-- **自动备份** — 应用布局前自动保存当前状态
-- **自定义方案** — 保存常用布局方案随时加载
-- **历史记录** — 支持查看和还原历史备份
-- **一键还原** — 随时恢复到任意备份点
-
-</td>
-</tr>
-</table>
-
----
-
-## 🚀 快速开始
-
-### 方式一：直接运行（推荐）
-
-1. 前往 [Releases](https://github.com/sakura-love/desktop-icon-organizer-master/releases) 下载最新版 `DesktopIconOrganizer.exe`
-2. **右键 → 以管理员身份运行**
-3. 开始整理你的桌面！
-
-### 方式二：从源码运行
-
+### Option A: Run from source
 ```bash
-# 克隆仓库
 git clone https://github.com/sakura-love/desktop-icon-organizer-master.git
 cd desktop-icon-organizer-master
-
-# 安装依赖
 pip install -r requirements.txt
-
-# 运行（需管理员权限）
 python main.py
 ```
 
-### 打包为单文件
-
+### Option B: Build executable
 ```bash
 pip install pyinstaller
-python -m PyInstaller build.spec --clean --noconfirm
+python -m PyInstaller --clean --noconfirm build.spec
 ```
+Output executable:
+- `dist/DesktopIconOrganizer_v2.0.exe`
 
----
+## Typical Workflow
+1. Scan desktop icons.
+2. Run automatic classification or online classification.
+3. Review in preview and drag icons if needed.
+4. Optionally modify category for specific icons (manual overrides are persisted).
+5. Select overlay border style and show overlay.
+6. Apply layout to desktop.
+7. Optionally save persistent layout / backups.
 
-## 🆕 最近更新（2026-04-13）
-
-- 修复打包版在应用布局后关闭主界面，偶发弹出 `Failed to remove temporary directory ... _MEIxxxxxx` 的问题。
-- 优化叠加层子进程启动环境（PyInstaller 模式下设置 `PYINSTALLER_RESET_ENVIRONMENT=1`），避免父子进程临时解压目录清理冲突。
-- 提升打包版退出稳定性，降低关闭后延迟报错概率。
-
----
-
-## 📸 截图预览
-
-### 1. 原始桌面
-![原始桌面](screenshots/1.png)
-
-### 2. 软件主界面
-![软件主界面](screenshots/2.png)
-
-### 3. 布局预览
-![布局预览](screenshots/3.png)
-
-### 4. 应用到桌面
-![应用到桌面](screenshots/4.png)
-
-### 5. 分类边框叠加层
-![分类边框叠加层](screenshots/5.png)
-
----
-
-## 🏗️ 技术架构
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    MainApp (GUI)                        │
-│              customtkinter + Windows 11 深色主题         │
-└───────────────────────┬─────────────────────────────────┘
-                        │
-    ┌───────────────────┼───────────────────┐
-    ▼                   ▼                   ▼
-┌───────────┐   ┌───────────────┐   ┌───────────────┐
-│  Scanner  │   │  Classifier   │   │ Layout Engine │
-│ Win32 API │   │ Keyword+AI    │   │ Grid Layout   │
-└───────────┘   └───────────────┘   └───────────────┘
-                        │
-                        ▼
-              ┌─────────────────┐
-              │ Overlay Process │
-              │ 独立子进程 + IPC │
-              └─────────────────┘
-```
-
-| 模块 | 技术 | 说明 |
-|---|---|---|
-| GUI 框架 | CustomTkinter | Windows 11 风格深色主题 |
-| 图标扫描 | Win32 API | 跨进程访问 `SysListView32` |
-| 图像渲染 | Pillow | BGRA 位图 + `UpdateLayeredWindow` |
-| 叠加层 | 独立进程 + JSON IPC | PID 心跳检测 + 控制文件通信 |
-| 分类引擎 | 多级策略 | 关键词 → 扩展名 → 联网搜索 |
-
----
-
-## 📁 项目结构
-
-```
+## Project Structure
+```text
 desktop-icon-organizer-master/
-├── main.py                # 主程序入口 (GUI)
-├── desktop_scanner.py     # 桌面图标扫描模块
-├── icon_classifier.py     # 图标分类模块
-├── layout_engine.py       # 布局引擎模块
-├── preview_canvas.py      # 布局预览画布
-├── desktop_overlay.py     # 桌面叠加层管理
-├── overlay_process.py     # 独立叠加层进程
-├── backup_manager.py      # 备份管理模块
-├── PingFang SC.ttf        # 叠加层中文字体
-├── app.ico                # 应用图标
-├── requirements.txt       # Python 依赖
-├── build.spec             # PyInstaller 配置
-├── backups/               # 桌面布局备份
-└── layouts/               # 自定义布局方案
+├── main.py                   # Main GUI app
+├── desktop_scanner.py        # Desktop icon scan/apply module
+├── icon_classifier.py        # Classification engine
+├── icon_profile_store.py     # Persistent icon profile and manual overrides
+├── layout_engine.py          # Layout calculation
+├── preview_canvas.py         # Layout preview canvas
+├── desktop_overlay.py        # Overlay manager and renderer
+├── overlay_process.py        # Standalone overlay subprocess
+├── backup_manager.py         # Backup/layout management
+├── build.spec                # PyInstaller spec
+├── build.bat                 # Build helper script
+├── requirements.txt          # Python dependencies
+├── screenshots/              # README screenshots
+├── backups/                  # Backup files
+└── layouts/                  # Saved layout files
 ```
 
----
+## Notes
+- In packaged mode, overlay process runs via `--overlay`.
+- If overlay seems stale, use “Hide Border” and show again.
+- The repository may contain local build artifacts in `build/`, `dist/`, and `__pycache__/`.
 
-## 🎨 分类类别
-
-| 类别 | 包含应用 |
-|---|---|
-| 🌐 浏览器 | Chrome, Edge, Firefox, Safari... |
-| 📄 办公软件 | Office, WPS, PDF 阅读器... |
-| 💻 开发工具 | VS Code, PyCharm, Git... |
-| 🎬 影音娱乐 | 播放器, 音乐, 直播... |
-| 💬 社交通讯 | 微信, QQ, 钉钉, Telegram... |
-| ⚙️ 系统工具 | 设置, 驱动, 终端, 压缩... |
-| 🎮 游戏 | Steam, Epic, 游戏启动器... |
-| 🎨 设计创意 | PS, AI, Figma, Blender... |
-| 📦 其他 | 未分类应用 |
-
----
-
-## ⚙️ 系统要求
-
-- **操作系统**: Windows 10 / 11
-- **权限**: 需要以管理员身份运行
-- **Python**: 3.9+ (仅从源码运行时需要)
-
----
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 创建 Pull Request
-
----
-
-## 📄 许可证
-
-本项目基于 [MIT License](LICENSE) 开源。
-
----
-
-<div align="center">
-
-**如果这个项目对你有帮助，请给一个 ⭐ Star 支持一下！**
-
-Made with ❤️ by [sakura-love](https://github.com/sakura-love)
-
-*Last updated: April 2026*
-
-### Latest Patch (v2.0, 2026-04-25)
-- Added persistent icon profile storage (`icon_profile.json`) after desktop scan.
-- After classification, each icon now stores both category and layout position in profile data.
-- Manual category changes are persisted and take priority in later auto/online classification.
-- Added selectable overlay border styles: `rounded`, `square`, `corner`, `bracket` (UI displays Chinese labels).
-- Fixed overlay duplication issue by enforcing single-instance overlay process and cleaning stale duplicates.
-- Updated build output name to `DesktopIconOrganizer_v2.0.exe`.
-
-</div>
+## License
+MIT License. See [LICENSE](LICENSE).
