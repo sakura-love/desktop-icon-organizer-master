@@ -40,6 +40,8 @@ LABEL_FONT_SIZE = 14
 UNIFIED_COLOR = "#5A7A8B"
 BOTTOM_EXTRA = 24
 MARGIN_X = 4
+DEFAULT_BORDER_STYLE = "rounded"
+BORDER_STYLES = ["rounded", "square", "corner", "bracket"]
 
 
 def hex_to_rgba(hex_color: str, alpha: int = 255):
@@ -48,6 +50,39 @@ def hex_to_rgba(hex_color: str, alpha: int = 255):
     g = int(hex_color[2:4], 16)
     b = int(hex_color[4:6], 16)
     return (r, g, b, alpha)
+
+
+def _draw_border_frame(draw, box, outline_rgba, radius: int, style: str, d: float):
+    x1, y1, x2, y2 = box
+    if style == "square":
+        draw.rectangle([x1, y1, x2, y2], outline=outline_rgba, width=1)
+        return
+
+    if style == "corner":
+        arm = max(10, int(18 * d))
+        draw.line([(x1, y1 + arm), (x1, y1), (x1 + arm, y1)], fill=outline_rgba, width=2)
+        draw.line([(x2 - arm, y1), (x2, y1), (x2, y1 + arm)], fill=outline_rgba, width=2)
+        draw.line([(x1, y2 - arm), (x1, y2), (x1 + arm, y2)], fill=outline_rgba, width=2)
+        draw.line([(x2 - arm, y2), (x2, y2), (x2, y2 - arm)], fill=outline_rgba, width=2)
+        return
+
+    if style == "bracket":
+        arm = max(8, int(14 * d))
+        draw.line([(x1, y1), (x1, y2)], fill=outline_rgba, width=2)
+        draw.line([(x1, y1), (x1 + arm, y1)], fill=outline_rgba, width=2)
+        draw.line([(x1, y2), (x1 + arm, y2)], fill=outline_rgba, width=2)
+        draw.line([(x2, y1), (x2, y2)], fill=outline_rgba, width=2)
+        draw.line([(x2 - arm, y1), (x2, y1)], fill=outline_rgba, width=2)
+        draw.line([(x2 - arm, y2), (x2, y2)], fill=outline_rgba, width=2)
+        return
+
+    draw.rounded_rectangle(
+        [x1, y1, x2, y2],
+        radius=radius,
+        fill=None,
+        outline=outline_rgba,
+        width=1,
+    )
 
 
 def _load_font(size: int):
@@ -89,7 +124,7 @@ def _load_font(size: int):
     return ImageFont.load_default()
 
 
-def _render_overlay(layout: DesktopLayout, dpi_scale: float):
+def _render_overlay(layout: DesktopLayout, dpi_scale: float, border_style: str = DEFAULT_BORDER_STYLE):
     """渲染叠加层图像（供主进程和 overlay_process.py 共用）"""
     if not layout.category_layouts:
         return None
@@ -143,12 +178,13 @@ def _render_overlay(layout: DesktopLayout, dpi_scale: float):
         if x2 <= x1 or y2 <= y1:
             continue
 
-        draw.rounded_rectangle(
+        _draw_border_frame(
+            draw,
             [x1, y1, x2, y2],
+            outline_rgba=outline_rgba,
             radius=actual_radius,
-            fill=None,
-            outline=outline_rgba,
-            width=1,
+            style=border_style if border_style in BORDER_STYLES else DEFAULT_BORDER_STYLE,
+            d=d,
         )
 
         # 绘制类别标签（带半透明背景条提高可读性）
@@ -181,13 +217,19 @@ def _render_overlay(layout: DesktopLayout, dpi_scale: float):
     return img
 
 
-def _write_layout(layout: DesktopLayout, dpi_scale: float, icon_positions: list = None):
+def _write_layout(
+    layout: DesktopLayout,
+    dpi_scale: float,
+    icon_positions: list = None,
+    border_style: str = DEFAULT_BORDER_STYLE,
+):
     """将布局数据序列化写入文件"""
     data = {
         "total_width": layout.total_width,
         "total_height": layout.total_height,
         "cell_height": layout.cell_height,
         "dpi_scale": dpi_scale,
+        "border_style": border_style if border_style in BORDER_STYLES else DEFAULT_BORDER_STYLE,
         "categories": [],
         "cells": [],
         "icon_positions": icon_positions or [],
@@ -214,42 +256,70 @@ def _write_control(command: str):
         json.dump({"command": command}, f)
 
 
-def _find_overlay_process() -> Optional[subprocess.Popen]:
-    """查找正在运行的叠加层进程"""
+def _is_overlay_cmdline(cmdline) -> bool:
+    if not cmdline:
+        return False
+    lowered = [str(arg).lower() for arg in cmdline]
+    if any("overlay_process.py" in arg for arg in lowered):
+        return True
+    if "--overlay" in lowered:
+        return True
+    return False
+
+
+def _find_overlay_processes():
     try:
         import psutil
+        procs = []
         for proc in psutil.process_iter(["pid", "cmdline"]):
             try:
                 cmdline = proc.info.get("cmdline") or []
-                if any("overlay_process.py" in str(arg) for arg in cmdline):
-                    return proc
+                if _is_overlay_cmdline(cmdline):
+                    procs.append(proc)
             except (psutil.NoSuchProcess, psutil.AccessDenied):
                 continue
+        return procs
     except ImportError:
+        return []
+
+
+def _find_overlay_process():
+    procs = _find_overlay_processes()
+    return procs[0] if procs else None
+
+
+def _stop_all_overlay_processes(timeout: float = 1.5):
+    procs = _find_overlay_processes()
+    if not procs:
+        return
+
+    try:
+        _write_control("stop")
+    except Exception:
         pass
-    return None
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not _find_overlay_processes():
+            return
+        time.sleep(0.1)
+
+    for proc in _find_overlay_processes():
+        try:
+            proc.terminate()
+        except Exception:
+            pass
 
 
 def _is_overlay_running() -> bool:
-    """检查叠加层进程是否正在运行"""
     try:
-        # 方法1：检查控制文件是否存在（进程存在时会定期检查）
-        # 方法2：检查是否有 overlay_process.py 进程
-        result = subprocess.run(
-            ["tasklist", "/FI", "IMAGENAME eq python.exe", "/FO", "CSV", "/NH"],
-            capture_output=True, text=True, timeout=5
-        )
-        if "python" in result.stdout.lower():
-            # 进一步检查是否有 overlay_process
-            try:
-                import psutil
-                proc = _find_overlay_process()
-                return proc is not None
-            except ImportError:
-                pass
-        return False
+        if os.path.exists(_PID_FILE):
+            mtime = os.path.getmtime(_PID_FILE)
+            if time.time() - mtime < 10:
+                return True
     except Exception:
-        return False
+        pass
+    return bool(_find_overlay_processes())
 
 
 class DesktopOverlay:
@@ -269,28 +339,37 @@ class DesktopOverlay:
     def last_error(self) -> Optional[str]:
         return self._error
 
-    def show(self, layout: DesktopLayout, dpi_scale: float = 1.0, icon_positions: list = None) -> bool:
+    def show(
+        self,
+        layout: DesktopLayout,
+        dpi_scale: float = 1.0,
+        icon_positions: list = None,
+        border_style: str = DEFAULT_BORDER_STYLE,
+    ) -> bool:
         """显示叠加层"""
         self._error = None
 
         # 检查是否已有叠加层进程在运行
-        existing = _find_overlay_process()
+        existing_procs = _find_overlay_processes()
+        if len(existing_procs) > 1:
+            _stop_all_overlay_processes()
+            existing_procs = _find_overlay_processes()
+
+        existing = existing_procs[0] if existing_procs else None
         if existing:
-            # 已有进程运行，发送更新指令
             try:
-                _write_layout(layout, dpi_scale, icon_positions)
+                _write_layout(layout, dpi_scale, icon_positions, border_style)
                 _write_control("update")
                 self._visible = True
                 self._started_by_us = False
-                print("[Overlay] 已有叠加层进程，发送更新指令")
                 return True
             except Exception as e:
-                self._error = f"发送更新指令失败: {e}"
+                self._error = f"update overlay failed: {e}"
                 return False
 
         # 启动新进程
         try:
-            _write_layout(layout, dpi_scale, icon_positions)
+            _write_layout(layout, dpi_scale, icon_positions, border_style)
 
             # PyInstaller 打包模式：使用 --overlay 参数启动自身
             # 开发模式：使用 python overlay_process.py
@@ -342,23 +421,9 @@ class DesktopOverlay:
             return False
 
     def hide(self):
-        """隐藏叠加层"""
-        if self._started_by_us and self._process:
-            try:
-                _write_control("stop")
-                self._process.wait(timeout=5)
-            except Exception:
-                try:
-                    self._process.terminate()
-                except Exception:
-                    pass
-            self._process = None
-        else:
-            # 由其他进程启动的，通过控制文件通知
-            try:
-                _write_control("stop")
-            except Exception:
-                pass
+        """Hide overlay."""
+        _stop_all_overlay_processes(timeout=2.0)
+        self._process = None
         self._visible = False
 
 
@@ -366,13 +431,19 @@ class DesktopOverlay:
 _overlay: Optional[DesktopOverlay] = None
 
 
-def show_desktop_overlay(layout: DesktopLayout, dpi_scale: float = 1.0, root=None, icon_positions: list = None):
+def show_desktop_overlay(
+    layout: DesktopLayout,
+    dpi_scale: float = 1.0,
+    root=None,
+    icon_positions: list = None,
+    border_style: str = DEFAULT_BORDER_STYLE,
+):
     """显示桌面叠加层"""
     global _overlay
     if _overlay is None:
         _overlay = DesktopOverlay()
 
-    success = _overlay.show(layout, dpi_scale, icon_positions)
+    success = _overlay.show(layout, dpi_scale, icon_positions, border_style)
     if not success:
         err_msg = _overlay.last_error or "未知错误"
         raise RuntimeError(f"显示叠加层失败:\n{err_msg}")
@@ -390,8 +461,7 @@ def is_overlay_running() -> bool:
     except Exception:
         pass
     # 方法2：psutil 检查进程
-    proc = _find_overlay_process()
-    return proc is not None
+    return bool(_find_overlay_processes())
 
 
 def hide_desktop_overlay():
@@ -403,7 +473,7 @@ def hide_desktop_overlay():
         # 没有本进程的 DesktopOverlay 实例，
         # 但可能有其他进程启动的叠加层，通过控制文件通知关闭
         try:
-            _write_control("stop")
+            _stop_all_overlay_processes(timeout=2.0)
         except Exception:
             pass
 
@@ -470,13 +540,19 @@ def disable_autostart():
 
 # ===================== 布局持久化 =====================
 
-def save_persistent_layout(layout: DesktopLayout, dpi_scale: float, icon_positions: list = None):
+def save_persistent_layout(
+    layout: DesktopLayout,
+    dpi_scale: float,
+    icon_positions: list = None,
+    border_style: str = DEFAULT_BORDER_STYLE,
+):
     """保存布局到持久化文件（开机后自动加载）"""
     data = {
         "total_width": layout.total_width,
         "total_height": layout.total_height,
         "cell_height": layout.cell_height,
         "dpi_scale": dpi_scale,
+        "border_style": border_style if border_style in BORDER_STYLES else DEFAULT_BORDER_STYLE,
         "categories": [],
         "cells": [],
         "icon_positions": icon_positions or [],

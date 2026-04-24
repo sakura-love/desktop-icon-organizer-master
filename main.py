@@ -42,6 +42,8 @@ from backup_manager import (
     get_latest_backup,
 )
 from desktop_overlay import (
+    BORDER_STYLES,
+    DEFAULT_BORDER_STYLE,
     show_desktop_overlay,
     hide_desktop_overlay,
     is_overlay_running,
@@ -53,6 +55,13 @@ from desktop_overlay import (
     clear_persistent_layout,
 )
 from preview_canvas import DragDropPreviewCanvas
+from icon_profile_store import (
+    build_icon_key,
+    get_manual_overrides,
+    set_manual_category,
+    update_classification_snapshot,
+    upsert_scan_icons,
+)
 
 
 # ===================== 主题配置 =====================
@@ -76,6 +85,13 @@ COLORS = {
 }
 
 FONT_FAMILY = "Microsoft YaHei UI"
+BORDER_STYLE_LABELS = {
+    "rounded": "\u5706\u89d2",
+    "square": "\u76f4\u89d2",
+    "corner": "\u89d2\u6807",
+    "bracket": "\u62ec\u53f7",
+}
+BORDER_LABEL_TO_STYLE = {label: key for key, label in BORDER_STYLE_LABELS.items()}
 
 
 class ScrollableFrame(ctk.CTkScrollableFrame):
@@ -203,6 +219,7 @@ class MainApp(ctk.CTk):
         self._desktop_h = self._desktop_info.workarea_height
         self._processing = False
         self._overlay_shown = False
+        self._border_style = DEFAULT_BORDER_STYLE
 
         # 构建界面
         self._build_ui()
@@ -297,6 +314,29 @@ class MainApp(ctk.CTk):
 
         self._hide_overlay_btn = ToolButton(row1, text="隐藏边框", icon_text="🚫", command=self._hide_overlay, width=110)
         self._hide_overlay_btn.pack(side="left", padx=(0, 6))
+
+        ctk.CTkLabel(
+            row1,
+            text="边框样式:",
+            font=(FONT_FAMILY, 10),
+            text_color=COLORS["text_secondary"],
+        ).pack(side="left", padx=(8, 4))
+
+        self._border_style_option = ctk.CTkOptionMenu(
+            row1,
+            values=[BORDER_STYLE_LABELS[s] for s in BORDER_STYLES],
+            width=110,
+            height=30,
+            font=(FONT_FAMILY, 10),
+            fg_color=COLORS["card"],
+            button_color=COLORS["bg_light"],
+            button_hover_color=COLORS["accent2"],
+            dropdown_fg_color=COLORS["card"],
+            text_color=COLORS["text_primary"],
+            command=self._on_border_style_changed,
+        )
+        self._border_style_option.pack(side="left", padx=(0, 6))
+        self._border_style_option.set(BORDER_STYLE_LABELS.get(self._border_style, self._border_style))
 
         # 右侧状态
         self._status_label = ctk.CTkLabel(
@@ -674,6 +714,7 @@ class MainApp(ctk.CTk):
             try:
                 icons = scan_all_icons(extract_images=True)
                 self._icons = icons
+                self._sync_profile_after_scan(icons)
 
                 # 更新 UI（线程安全）
                 self.after(0, lambda: self._on_scan_complete(icons))
@@ -716,11 +757,24 @@ class MainApp(ctk.CTk):
 
         def worker():
             try:
+                manual_overrides = get_manual_overrides(self._icons)
                 classified = classify_all_icons(
                     self._icons,
                     use_online=online,
                     progress_callback=progress_cb,
                 )
+
+                if manual_overrides:
+                    for icon in self._icons:
+                        manual_category = manual_overrides.get(build_icon_key(icon))
+                        if manual_category:
+                            icon.category = manual_category
+
+                    rebuilt: dict[str, list[DesktopIcon]] = {}
+                    for icon in self._icons:
+                        rebuilt.setdefault(icon.category, []).append(icon)
+                    classified = rebuilt
+
                 self._classified = classified
                 self.after(0, lambda: self._on_classify_complete(classified))
             except Exception as e:
@@ -738,6 +792,7 @@ class MainApp(ctk.CTk):
         self._set_progress(1.0)
         self._update_category_cards()
         self._generate_and_show_layout()
+        self._sync_profile_after_classification()
 
     def _generate_and_show_layout(self):
         """生成布局并显示在预览中"""
@@ -812,6 +867,7 @@ class MainApp(ctk.CTk):
 
             self._rebuild_classified_from_layout()
             self._update_category_cards()
+            self._sync_profile_after_classification()
             self._set_status(f"已交换: {src_name} ↔ {dst_name}")
 
     def _rebuild_classified_from_layout(self):
@@ -899,6 +955,10 @@ class MainApp(ctk.CTk):
 
         old_category = icon.category
         icon.category = new_category
+        try:
+            set_manual_category(icon, new_category)
+        except Exception as e:
+            print(f"[Profile] manual category save failed: {e}")
 
         # 更新分类字典
         if old_category in self._classified:
@@ -913,6 +973,7 @@ class MainApp(ctk.CTk):
         # 重新生成布局
         self._generate_and_show_layout()
         self._update_category_cards()
+        self._sync_profile_after_classification()
 
         self._set_status(f"已将「{icon.name}」从「{old_category}」移至「{new_category}」")
 
@@ -972,12 +1033,54 @@ class MainApp(ctk.CTk):
             for name, x, y in layout_to_icon_list(self._layout)
         ]
 
+    def _build_layout_position_map(self) -> dict[str, tuple[int, int]]:
+        if not self._layout:
+            return {}
+        return {name: (x, y) for name, x, y in layout_to_icon_list(self._layout)}
+
+    def _sync_profile_after_scan(self, icons: list[DesktopIcon]):
+        try:
+            upsert_scan_icons(icons)
+        except Exception as e:
+            print(f"[Profile] scan sync failed: {e}")
+
+    def _sync_profile_after_classification(self):
+        try:
+            update_classification_snapshot(self._icons, self._build_layout_position_map())
+        except Exception as e:
+            print(f"[Profile] classification sync failed: {e}")
+
+    def _on_border_style_changed(self, style_label: str):
+        style = BORDER_LABEL_TO_STYLE.get(style_label)
+        if style not in BORDER_STYLES:
+            return
+        self._border_style = style
+        self._set_status(f"边框样式已切换: {style_label}")
+        if self._overlay_shown and self._layout:
+            try:
+                icon_positions = self._build_overlay_icon_positions()
+                show_desktop_overlay(
+                    self._layout,
+                    self._desktop_info.dpi_scale,
+                    root=self,
+                    icon_positions=icon_positions,
+                    border_style=self._border_style,
+                )
+            except Exception as e:
+                self._on_error(f"更新边框样式失败:\n{e}")
+
     def _show_overlay_after_apply(self):
         """应用布局后重新显示叠加层"""
         if self._layout:
             try:
                 icon_positions = self._build_overlay_icon_positions()
-                show_desktop_overlay(self._layout, self._desktop_info.dpi_scale, root=self, icon_positions=icon_positions)
+                show_desktop_overlay(
+                    self._layout,
+                    self._desktop_info.dpi_scale,
+                    root=self,
+                    icon_positions=icon_positions,
+                    border_style=self._border_style,
+                )
                 self._overlay_shown = True
                 self._update_overlay_buttons()
             except Exception:
@@ -1017,7 +1120,12 @@ class MainApp(ctk.CTk):
         icon_positions = self._build_overlay_icon_positions()
 
         # 保存持久化布局
-        if save_persistent_layout(self._layout, self._desktop_info.dpi_scale, icon_positions):
+        if save_persistent_layout(
+            self._layout,
+            self._desktop_info.dpi_scale,
+            icon_positions,
+            border_style=self._border_style,
+        ):
             self._set_status("持久化布局已保存 | 开机后将自动恢复")
             messagebox.showinfo("成功", "持久化布局已保存！\n\n开机后将自动恢复叠加层和图标位置。")
         else:
@@ -1063,7 +1171,13 @@ class MainApp(ctk.CTk):
         self.update_idletasks()
         try:
             icon_positions = self._build_overlay_icon_positions()
-            show_desktop_overlay(self._layout, self._desktop_info.dpi_scale, root=self, icon_positions=icon_positions)
+            show_desktop_overlay(
+                self._layout,
+                self._desktop_info.dpi_scale,
+                root=self,
+                icon_positions=icon_positions,
+                border_style=self._border_style,
+            )
             self._overlay_shown = True
             self._update_overlay_buttons()
             self._set_status("桌面边框已显示")

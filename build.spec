@@ -45,7 +45,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='DesktopIconOrganizer',
+    name='DesktopIconOrganizer_v2.0',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

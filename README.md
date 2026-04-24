@@ -227,4 +227,12 @@ Made with ❤️ by [sakura-love](https://github.com/sakura-love)
 
 *Last updated: April 2026*
 
+### Latest Patch (v2.0, 2026-04-25)
+- Added persistent icon profile storage (`icon_profile.json`) after desktop scan.
+- After classification, each icon now stores both category and layout position in profile data.
+- Manual category changes are persisted and take priority in later auto/online classification.
+- Added selectable overlay border styles: `rounded`, `square`, `corner`, `bracket` (UI displays Chinese labels).
+- Fixed overlay duplication issue by enforcing single-instance overlay process and cleaning stale duplicates.
+- Updated build output name to `DesktopIconOrganizer_v2.0.exe`.
+
 </div>

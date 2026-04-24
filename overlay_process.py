@@ -443,6 +443,7 @@ def main():
         data = json.load(f)
 
     dpi_scale = data.get("dpi_scale", 1.0)
+    border_style = data.get("border_style", "rounded")
 
     # 开机自启动模式：恢复图标位置
     if autostart_mode and data.get("icon_positions"):
@@ -454,7 +455,7 @@ def main():
 
     # 导入并调用渲染函数（确保与主程序完全一致的渲染效果）
     _init_modules()
-    img = desktop_overlay._render_overlay(layout, dpi_scale)
+    img = desktop_overlay._render_overlay(layout, dpi_scale, border_style=border_style)
     if img is None:
         print("[Overlay] 渲染失败，退出")
         sys.exit(1)
@@ -491,10 +492,11 @@ def main():
                 with open(update_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 dpi_scale = data.get("dpi_scale", 1.0)
+                border_style = data.get("border_style", "rounded")
                 # 更新图标位置
                 icon_positions = data.get("icon_positions", [])
                 layout = _rebuild_layout(data)
-                img = desktop_overlay._render_overlay(layout, dpi_scale)
+                img = desktop_overlay._render_overlay(layout, dpi_scale, border_style=border_style)
                 if img:
                     bgra_data = _rgba_to_bgra(img)
                     ox, oy = get_workarea_offset()
