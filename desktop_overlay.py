@@ -264,6 +264,8 @@ def _is_overlay_cmdline(cmdline) -> bool:
         return True
     if "--overlay" in lowered:
         return True
+    if "--autostart" in lowered:
+        return True
     return False
 
 
@@ -288,11 +290,38 @@ def _find_overlay_process():
     return procs[0] if procs else None
 
 
-def _stop_all_overlay_processes(timeout: float = 1.5):
-    procs = _find_overlay_processes()
-    if not procs:
-        return
+def _read_overlay_pid() -> Optional[int]:
+    """Read overlay pid from heartbeat file."""
+    try:
+        if not os.path.exists(_PID_FILE):
+            return None
+        with open(_PID_FILE, "r", encoding="utf-8") as f:
+            value = f.read().strip()
+        pid = int(value)
+        return pid if pid > 0 else None
+    except Exception:
+        return None
 
+
+def _is_pid_running(pid: Optional[int]) -> bool:
+    """Check whether a process id is still alive."""
+    if not pid:
+        return False
+    try:
+        os.kill(pid, 0)
+        return True
+    except Exception:
+        return False
+
+
+def _has_overlay_process(pid_hint: Optional[int] = None) -> bool:
+    if _is_pid_running(pid_hint):
+        return True
+    return bool(_find_overlay_processes())
+
+
+def _stop_all_overlay_processes(timeout: float = 1.5):
+    pid_hint = _read_overlay_pid()
     try:
         _write_control("stop")
     except Exception:
@@ -300,7 +329,7 @@ def _stop_all_overlay_processes(timeout: float = 1.5):
 
     deadline = time.time() + timeout
     while time.time() < deadline:
-        if not _find_overlay_processes():
+        if not _has_overlay_process(pid_hint):
             return
         time.sleep(0.1)
 
@@ -310,16 +339,22 @@ def _stop_all_overlay_processes(timeout: float = 1.5):
         except Exception:
             pass
 
+    deadline = time.time() + 1.0
+    while time.time() < deadline:
+        if not _has_overlay_process(pid_hint):
+            return
+        time.sleep(0.1)
+
+    for proc in _find_overlay_processes():
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
 
 def _is_overlay_running() -> bool:
-    try:
-        if os.path.exists(_PID_FILE):
-            mtime = os.path.getmtime(_PID_FILE)
-            if time.time() - mtime < 10:
-                return True
-    except Exception:
-        pass
-    return bool(_find_overlay_processes())
+    pid = _read_overlay_pid()
+    return _has_overlay_process(pid)
 
 
 class DesktopOverlay:
@@ -451,17 +486,7 @@ def show_desktop_overlay(
 
 def is_overlay_running() -> bool:
     """检查是否有叠加层进程正在运行"""
-    # 方法1：通过 PID 心跳文件检测
-    try:
-        if os.path.exists(_PID_FILE):
-            mtime = os.path.getmtime(_PID_FILE)
-            age = time.time() - mtime
-            if age < 10:  # 心跳文件 10 秒内更新过
-                return True
-    except Exception:
-        pass
-    # 方法2：psutil 检查进程
-    return bool(_find_overlay_processes())
+    return _is_overlay_running()
 
 
 def hide_desktop_overlay():
