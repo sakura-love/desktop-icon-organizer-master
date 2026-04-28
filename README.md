@@ -1,13 +1,13 @@
-﻿<div align="center">
+<div align="center">
 
 # Desktop Icon Organizer
 
-**让凌乱桌面在 1 分钟内变成可维护的分类布局**
+**智能桌面图标整理工具 — 分类、预览、一键排列、持久记忆**
 
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D4?style=flat-square)](#)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=flat-square)](#)
 [![License](https://img.shields.io/badge/License-MIT-22C55E?style=flat-square)](LICENSE)
-[![Release](https://img.shields.io/badge/Release-v2.0-FF6B6B?style=flat-square)](#最近更新)
+[![Release](https://img.shields.io/badge/Release-v2.5-FF6B6B?style=flat-square)](#最近更新)
 
 English: [README.en.md](README.en.md)
 
@@ -15,28 +15,63 @@ English: [README.en.md](README.en.md)
 
 ---
 
-## 为什么这个项目值得用
+## 为什么选择这个工具
 
-很多桌面整理工具只能“排一次”，下次新增图标又要重来。
+市面上的桌面整理工具大多只能"排一次就完事"，下次新增图标又要手动重来。
 
-这个项目的核心目标是：
-- 不止自动分类
-- 还能记住你的人工修正
-- 让后续每次整理都越来越符合你的习惯
+Desktop Icon Organizer 的核心理念是**越用越懂你**：
+
+- 自动分类桌面图标（关键词 + 扩展名 + 联网识别）
+- **手动修改会被记住**，下次整理自动应用你的偏好
+- 分类前可预览、可拖拽调整，确认后再应用到桌面
+- 独立进程渲染分类边框，重启后自动恢复布局
 
 ---
 
-## 核心能力
+## 功能一览
 
-| 能力 | 说明 |
-|---|---|
-| 桌面扫描 | 基于 Win32 ListView API 获取图标、位置、目标路径 |
-| 自动分类 | 关键词 + 扩展名规则分类 |
-| 联网分类 | 自动规则不确定时可联网补充判断 |
-| 人工优先 | 手动修改过的分类会持久化并在下次优先使用 |
-| 可视化预览 | 拖拽交换图标位置，应用前可确认效果 |
-| 边框叠加层 | 独立进程渲染分类边框，支持多样式 |
-| 布局管理 | 备份、还原、保存方案、加载方案 |
+<table>
+<tr>
+<td width="50%">
+
+**扫描与分类**
+- 基于 Win32 ListView API 深度扫描桌面
+- 14 个预设类别（浏览器、办公、开发、游戏…）
+- 关键词匹配 + 文件扩展名 + 联网搜索三级分类
+- 手动修改的分类永久记忆，优先级最高
+
+</td>
+<td width="50%">
+
+**布局与预览**
+- 竖向分区网格布局，图标互不重叠
+- 实时预览画布，支持拖拽交换位置
+- 缩放查看（50% ~ 200%）
+- 一键应用布局到真实桌面
+
+</td>
+</tr>
+<tr>
+<td>
+
+**边框叠加层**
+- 独立进程渲染，主程序退出后仍保持
+- 4 种边框样式：圆角 / 直角 / 角标 / 括号
+- 嵌入桌面窗口层级，不遮挡其他应用
+- 开机自启动，自动恢复叠加层和图标位置
+
+</td>
+<td>
+
+**备份与方案管理**
+- 一键备份当前桌面布局
+- 多方案保存/加载，随时切换不同布局
+- 持久化布局：开机后自动恢复
+- 完整的备份列表管理（查看/删除）
+
+</td>
+</tr>
+</table>
 
 ---
 
@@ -44,17 +79,25 @@ English: [README.en.md](README.en.md)
 
 ![主界面](screenshots/2.png)
 
-更多截图：
+<details>
+<summary>更多截图</summary>
+
 - [原始桌面](screenshots/1.png)
 - [布局预览](screenshots/3.png)
 - [应用布局](screenshots/4.png)
 - [边框叠加层](screenshots/5.png)
 
+</details>
+
 ---
 
 ## 快速开始
 
-### 方式 A：直接运行源码
+### 方式 A：下载 EXE（推荐）
+
+前往 [Releases](https://github.com/sakura-love/desktop-icon-organizer-master/releases) 下载最新版本，双击运行即可。
+
+### 方式 B：从源码运行
 
 ```bash
 git clone https://github.com/sakura-love/desktop-icon-organizer-master.git
@@ -63,48 +106,43 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### 方式 B：打包 EXE
+### 方式 C：自行打包
 
 ```bash
 pip install pyinstaller
 python -m PyInstaller --clean --noconfirm build.spec
 ```
 
-输出文件：
-- `dist/DesktopIconOrganizer_v2.0.exe`
+输出文件：`dist/DesktopIconOrganizer_v2.5.exe`
 
 ---
 
-## 推荐使用流程
+## 使用流程
 
-1. 扫描桌面图标
-2. 自动分类或联网分类
-3. 在预览区拖拽微调
-4. 对个别图标手动改分类（会被记忆）
-5. 选择边框样式并显示边框
-6. 一键应用布局到桌面
-7. 需要时保存持久化布局/备份
+```
+扫描桌面 → 自动/联网分类 → 预览微调 → 手动修正（会被记住）→ 显示边框 → 应用布局
+```
+
+1. **扫描桌面** — 自动获取所有图标信息
+2. **自动分类** — 本地规则快速分类；或使用**联网分类**获取更准确的结果
+3. **预览调整** — 在画布中拖拽交换图标位置
+4. **手动修正** — 右侧面板修改个别图标的分类（下次自动应用）
+5. **显示边框** — 在桌面上叠加分类区域边框
+6. **应用布局** — 一键将预览布局应用到真实桌面
+7. **持久化** — 保存布局方案 / 开机自启动恢复
 
 ---
 
-## 最近更新
+## 技术栈
 
-### v2.0（2026-04-25）
-
-- 新增图标配置持久化文件：`icon_profile.json`
-- 分类结果可持久化每个图标的分类和布局位置
-- 手动修改分类会被保存，并在后续自动/联网分类中优先使用
-- 新增边框样式：
-  - `rounded`（圆角）
-  - `square`（直角）
-  - `corner`（角标）
-  - `bracket`（括号）
-- 样式选择器支持中文标签显示
-- 修复边框样式切换导致叠加层重复、多进程残留的问题：
-  - 叠加层单实例管理
-  - 兼容源码模式（`overlay_process.py`）与打包模式（`--overlay`）
-  - 自动清理重复/残留叠加进程
-- 打包输出名更新为：`DesktopIconOrganizer_v2.0.exe`
+| 组件 | 技术 |
+|---|---|
+| GUI | CustomTkinter (Windows 11 风格暗色主题) |
+| 桌面交互 | Win32 API (ctypes) — ListView 消息、跨进程内存读写 |
+| 图标提取 | SHGetFileInfo + HICON 转 PIL Image |
+| 叠加层 | 独立进程 + 分层窗口 (UpdateLayeredWindow) |
+| 分类引擎 | 本地关键词库 + DuckDuckGo Instant Answer API |
+| 打包 | PyInstaller 单文件 EXE |
 
 ---
 
@@ -124,44 +162,24 @@ flowchart LR
 
 ---
 
-## 关键配置文件
-
-- `icon_profile.json`：图标扫描信息 + 手动分类偏好
-- `layouts/*.json`：保存的布局方案
-- `backups/*.json`：桌面位置备份
-- `overlay_layout_persistent.json`：持久化叠加层布局
-
----
-
-## 常见问题
-
-### 1) 边框看起来没更新
-先点击“隐藏边框”，再点击“显示边框”。
-
-### 2) 为什么建议管理员权限运行
-桌面图标位置操作依赖系统窗口消息，管理员权限下稳定性更高。
-
-### 3) 打包后叠加层如何启动
-打包模式通过 `--overlay` 启动独立叠加层进程。
-
----
-
 ## 项目结构
 
 ```text
 desktop-icon-organizer-master/
 ├── main.py                   # 主 GUI 程序
-├── desktop_scanner.py        # 扫描/应用图标位置
-├── icon_classifier.py        # 分类引擎
+├── desktop_scanner.py        # Win32 桌面图标扫描与位置操作
+├── icon_classifier.py        # 分类引擎（关键词 + 扩展名 + 联网）
 ├── icon_profile_store.py     # 图标配置与手动分类偏好持久化
-├── layout_engine.py          # 布局计算
-├── preview_canvas.py         # 预览画布
-├── desktop_overlay.py        # 叠加层管理与渲染
-├── overlay_process.py        # 叠加层独立进程
-├── backup_manager.py         # 备份与布局管理
-├── build.spec                # PyInstaller 配置
-├── build.bat                 # 打包脚本
-├── requirements.txt          # 依赖
+├── layout_engine.py          # 网格布局计算
+├── preview_canvas.py         # 拖拽预览画布
+├── desktop_overlay.py        # 叠加层管理、渲染、开机自启
+├── overlay_process.py        # 叠加层独立进程（Win32 分层窗口）
+├── backup_manager.py         # 备份与布局方案管理
+├── build.spec                # PyInstaller 打包配置
+├── build.bat                 # 一键打包脚本
+├── requirements.txt          # Python 依赖
+├── app.ico                   # 应用图标
+├── PingFang SC.ttf           # 内置字体（叠加层标签渲染）
 ├── screenshots/              # README 截图
 ├── backups/                  # 备份目录
 └── layouts/                  # 布局方案目录
@@ -169,14 +187,74 @@ desktop-icon-organizer-master/
 
 ---
 
+## 关键数据文件
+
+| 文件 | 说明 |
+|---|---|
+| `icon_profile.json` | 图标扫描信息 + 手动分类偏好（自动生成） |
+| `layouts/*.json` | 保存的布局方案 |
+| `backups/*.json` | 桌面位置备份快照 |
+| `overlay_layout_persistent.json` | 持久化叠加层布局（开机自启用） |
+
+---
+
+## 最近更新
+
+### v2.5（2026-04-29）
+
+- 修复叠加层窗口不显示的问题（UpdateLayeredWindow 渲染丢失）
+- 修复叠加层 Z-order 管理，正确嵌入桌面窗口层级
+- 修复预览画布图标图像 GC 回收导致不显示
+- 修复加载布局时界面卡死（改为异步回调）
+- 修复错误弹窗显示无意义 traceback
+- 移除不可达代码和冗余初始化
+
+### v2.0（2026-04-25）
+
+- 新增图标配置持久化：手动修改的分类会被记住并在后续优先使用
+- 新增 4 种边框样式（圆角 / 直角 / 角标 / 括号）
+- 叠加层单实例管理，自动清理残留进程
+- 兼容源码模式与 PyInstaller 打包模式
+
+---
+
+## 常见问题
+
+<details>
+<summary><b>Q: 边框看起来没更新</b></summary>
+
+先点击"隐藏边框"，再点击"显示边框"重新渲染。
+</details>
+
+<details>
+<summary><b>Q: 为什么建议管理员权限运行</b></summary>
+
+桌面图标位置操作依赖系统窗口消息（SendMessage 到 explorer.exe 的 ListView），管理员权限下稳定性更高。
+</details>
+
+<details>
+<summary><b>Q: 叠加层开机自启是怎么实现的</b></summary>
+
+在注册表 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 中添加启动项，以 `--autostart` 参数启动叠加层独立进程，读取持久化布局文件恢复。
+</details>
+
+<details>
+<summary><b>Q: 联网分类用的什么 API</b></summary>
+
+使用 DuckDuckGo Instant Answer API，无需 API Key，不记录用户数据。
+</details>
+
+---
+
 ## 贡献
 
-欢迎 Issue / PR。
+欢迎 Issue / PR！
 
-建议流程：
-1. Fork 仓库并创建分支
-2. 提交改动与说明
-3. 发起 Pull Request
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/xxx`)
+3. 提交改动 (`git commit -m 'Add xxx'`)
+4. 推送分支 (`git push origin feature/xxx`)
+5. 发起 Pull Request
 
 ---
 
