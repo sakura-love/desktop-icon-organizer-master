@@ -167,6 +167,7 @@ class PreviewCanvas(tk.Canvas):
             return
 
         self.delete("all")
+        self._photo_refs = []  # 重置图像引用列表，防止 GC 回收
 
         cw = self.winfo_width() or 800
         ch = self.winfo_height() or 600
@@ -271,10 +272,11 @@ class PreviewCanvas(tk.Canvas):
                         (int(ICON_SIZE * s), int(ICON_SIZE * s)),
                         resample=3,
                     )
-                    self._photo = tk.PhotoImage(img)
+                    photo = tk.PhotoImage(img)
+                    self._photo_refs.append(photo)
                     self.create_image(
                         icon_cx, icon_cy,
-                        image=self._photo,
+                        image=photo,
                         tags=("icon_img", f"icon_{cell.icon.name}")
                     )
                 except Exception:
@@ -410,6 +412,10 @@ class PreviewCanvas(tk.Canvas):
         """选中指定图标"""
         self._selected_icon = icon_name
         self._render()
+
+    def get_selected_icon(self) -> Optional[str]:
+        """获取当前选中的图标名"""
+        return self._selected_icon
 
 
 class DragDropPreviewCanvas(PreviewCanvas):

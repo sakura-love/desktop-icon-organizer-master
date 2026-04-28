@@ -376,7 +376,6 @@ def classify_all_icons(
     返回 {类别: [图标列表]} 的字典
     """
     classified: Dict[str, List[DesktopIcon]] = {cat: [] for cat in CATEGORIES}
-    classified["其他"] = []
 
     total = len(icons)
     for i, icon in enumerate(icons):

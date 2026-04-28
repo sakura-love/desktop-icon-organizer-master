@@ -9,6 +9,7 @@
 """
 
 import ctypes
+import ctypes.wintypes as wintypes
 import json
 import os
 import sys
@@ -170,6 +171,20 @@ def _get_last_error():
     return kernel32.GetLastError()
 
 
+def _log(msg):
+    """写调试日志到文件（exe 无控制台，print 看不到）"""
+    try:
+        log_path = os.path.join(
+            os.path.dirname(sys.executable) if getattr(sys, 'frozen', False)
+            else os.path.dirname(os.path.abspath(__file__)),
+            "overlay_debug.log",
+        )
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"[{time.strftime('%H:%M:%S')}] {msg}\n")
+    except Exception:
+        pass
+
+
 def get_workarea_offset():
     rect = RECT()
     user32.SystemParametersInfoW(0x0030, 0, ctypes.byref(rect), 0)
@@ -214,8 +229,53 @@ def _rebuild_layout(data):
     )
 
 
+def _find_workerw():
+    """查找桌面 WorkerW 窗口（位于桌面图标下层）。
+
+    原理：向 Progman 发送特殊消息 0x052C，Windows 会创建一个隐藏的
+    WorkerW 窗口，它位于桌面图标和 Progman 之间。将叠加层作为 WorkerW
+    的子窗口，即可保证叠加层始终位于所有普通窗口之下。
+    """
+    progman = user32.FindWindowW("Progman", "Program Manager")
+    if not progman:
+        return None
+
+    # 发送 0x052C 让 Progman 创建 WorkerW
+    result = ctypes.c_longlong()
+    user32.SendMessageTimeoutW(
+        progman, 0x052C, 0, 0,
+        0x0002,  # SMTO_ABORTIFHUNG
+        1000,
+        ctypes.byref(result),
+    )
+
+    workerw_hwnd = None
+
+    WNDENUMPROC = ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+
+    def enum_callback(hwnd, _lparam):
+        nonlocal workerw_hwnd
+        # 跳过 Progman 本身，只匹配 WorkerW
+        if hwnd == progman:
+            return True
+        # 找到包含 SHELLDLL_DefView 的 WorkerW 窗口
+        shell_view = user32.FindWindowExW(hwnd, None, "SHELLDLL_DefView", None)
+        if shell_view:
+            workerw_hwnd = hwnd
+            return False  # 停止枚举
+        return True  # 继续枚举
+
+    user32.EnumWindows(WNDENUMPROC(enum_callback), 0)
+    return workerw_hwnd
+
+
 def _create_layered_window(bgra_data, width, height, ox, oy):
-    """创建分层窗口"""
+    """创建分层窗口并渲染图像内容。
+
+    窗口层级（从底到顶）：
+        Progman → WorkerW(壁纸) → 桌面图标(SHELLDLL_DefView) → **叠加层** → 普通窗口
+    """
+    _log(f"CreateWindowExW: {width}x{height} @ ({ox},{oy}), data_len={len(bgra_data)}")
     hwnd = user32.CreateWindowExW(
         WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
         "Static", "",
@@ -224,8 +284,12 @@ def _create_layered_window(bgra_data, width, height, ox, oy):
         None, None, kernel32.GetModuleHandleW(None), None,
     )
     if not hwnd:
-        raise RuntimeError(f"CreateWindowExW 失败, 错误码: {_get_last_error()}")
+        err = _get_last_error()
+        _log(f"CreateWindowExW FAILED: {err}")
+        raise RuntimeError(f"CreateWindowExW 失败, 错误码: {err}")
+    _log(f"Window created: hwnd={hwnd:#x}")
 
+    # ---- 将 BGRA 图像数据渲染到分层窗口 ----
     hdc_screen = user32.GetDC(None)
     if not hdc_screen:
         user32.DestroyWindow(hwnd)
@@ -279,6 +343,8 @@ def _create_layered_window(bgra_data, width, height, ox, oy):
         hwnd, hdc_screen, None, ctypes.byref(size),
         hdc_mem, ctypes.byref(pt_src), 0, ctypes.byref(blend), ULW_ALPHA,
     )
+    _log(f"UpdateLayeredWindow result={result}")
+
     if not result:
         err = _get_last_error()
         gdi32.SelectObject(hdc_mem, old_bmp)
@@ -293,13 +359,11 @@ def _create_layered_window(bgra_data, width, height, ox, oy):
     gdi32.DeleteDC(hdc_mem)
     user32.ReleaseDC(None, hdc_screen)
 
-    # 设置 Z-order：放在 Progman 之上
-    progman = user32.FindWindowW("Progman", "Program Manager")
-    if progman:
-        user32.SetWindowPos(hwnd, progman, 0, 0, 0, 0,
-                           SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_SHOWWINDOW)
+    # ---- 设置 Z-order 和点击穿透 ----
+    user32.SetWindowPos(hwnd, None, 0, 0, 0, 0,
+                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW)
+    _log("SetWindowPos done")
 
-    # 添加点击穿透
     style = user32.GetWindowLongW(hwnd, -20)
     user32.SetWindowLongW(hwnd, -20, style | WS_EX_TRANSPARENT)
 

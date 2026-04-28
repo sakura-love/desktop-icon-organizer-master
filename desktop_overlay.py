@@ -445,12 +445,6 @@ class DesktopOverlay:
             self._visible = True
             print(f"[Overlay] 叠加层进程已启动, PID={self._process.pid}")
             return True
-        except subprocess.TimeoutExpired:
-            # 进程仍在运行（正常情况）
-            self._visible = True
-            self._started_by_us = True
-            print(f"[Overlay] 叠加层进程已启动, PID={self._process.pid}")
-            return True
         except Exception as e:
             self._error = f"启动叠加层进程失败: {e}"
             return False

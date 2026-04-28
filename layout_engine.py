@@ -148,7 +148,6 @@ def calculate_layout(
         total_cols = 1
 
     all_cells = []
-    all_icon_positions = []
     category_layouts = []
 
     current_x = GRID_MARGIN_X
@@ -202,10 +201,6 @@ def calculate_layout(
                     category=cat_name,
                 )
                 all_cells.append(cell)
-                # 记录图标像素位置（图标在cell内居中）
-                icon_px = px + (col_width - ICON_SIZE) // 2
-                icon_py = py + 4
-                all_icon_positions.append((icon.index, icon_px, icon_py))
 
                 icon_index += 1
             if icon_index >= icon_count:

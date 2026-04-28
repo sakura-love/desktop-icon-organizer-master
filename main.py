@@ -979,7 +979,7 @@ class MainApp(ctk.CTk):
 
     def _selected_icon_name(self) -> str | None:
         """获取当前选中的图标名"""
-        return self._preview_canvas._selected_icon
+        return self._preview_canvas.get_selected_icon()
 
     def _apply_layout(self):
         """应用布局到桌面"""
@@ -1445,18 +1445,48 @@ class MainApp(ctk.CTk):
 
         # 确保已扫描桌面，否则无法匹配图标名称
         if not self._icons:
-            self._scan_desktop()
             self._set_status("正在扫描桌面以加载布局...")
-            # 等待扫描完成（简单轮询，扫描通常很快）
-            import time
-            for _ in range(50):  # 最多等5秒
-                if self._icons or not self._processing:
-                    break
-                time.sleep(0.1)
-            if not self._icons:
-                messagebox.showerror("错误", "扫描桌面失败，无法加载布局")
-                return
+            self._pending_layout_data = data
+            self._scan_desktop_for_layout(data)
+            return
 
+        self._apply_loaded_layout(data)
+
+    def _scan_desktop_for_layout(self, data: dict):
+        """扫描桌面完成后加载布局（异步）"""
+        if self._processing:
+            return
+
+        self._processing = True
+
+        def worker():
+            try:
+                icons = scan_all_icons(extract_images=True)
+                self._icons = icons
+                self._sync_profile_after_scan(icons)
+                self.after(0, lambda: self._on_scan_for_layout_complete(icons, data))
+            except Exception as e:
+                self.after(0, lambda: self._on_error(f"扫描失败: {e}"))
+            finally:
+                self.after(0, lambda: setattr(self, '_processing', False))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_scan_for_layout_complete(self, icons: list[DesktopIcon], data: dict):
+        """扫描完成后再应用布局"""
+        self._classified = {}
+        self._layout = None
+        self._set_status(f"扫描完成 | 共找到 {len(icons)} 个图标")
+        self._update_category_cards()
+        if icons:
+            self._preview_canvas.set_raw_icons(icons, self._desktop_w, self._desktop_h)
+        if not self._icons:
+            messagebox.showerror("错误", "扫描桌面失败，无法加载布局")
+            return
+        self._apply_loaded_layout(data)
+
+    def _apply_loaded_layout(self, data: dict):
+        """将加载的布局数据应用到当前图标"""
         categories = data.get("categories", {})
         icon_info = data.get("icon_info", {})
 
@@ -1475,7 +1505,7 @@ class MainApp(ctk.CTk):
 
         self._generate_and_show_layout()
         self._update_category_cards()
-        self._set_status(f"布局已加载 | {filepath}")
+        self._set_status(f"布局已加载 | {data.get('name', '')}")
 
     def _show_backup_list(self):
         """显示备份列表"""
@@ -1625,7 +1655,11 @@ class MainApp(ctk.CTk):
     def _on_error(self, msg: str):
         """错误处理（可复制文本框）"""
         import traceback
-        full_msg = msg + "\n\n" + traceback.format_exc()
+        exc_info = traceback.format_exc()
+        if exc_info.strip() == "NoneType: None":
+            full_msg = msg
+        else:
+            full_msg = msg + "\n\n" + exc_info
         self._set_status(f"错误 | {msg}")
         self._set_progress(0)
 
