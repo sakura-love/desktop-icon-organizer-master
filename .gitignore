@@ -28,3 +28,9 @@ layouts/*.json
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Build artifacts (auto-generated)
+*.spec
+*.exe
+version.txt
+CHANGELOG_TEMP.md
